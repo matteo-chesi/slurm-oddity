@@ -1,0 +1,22 @@
+[package]
+name = "stage0"
+version = "0.0.1"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+chrono = "0.4.45"
+chrono-tz = "0.10.4"
+gethostname = "1.1.0"
+iana-time-zone = "0.1.65"
+log = "0.4.33"
+serde = { version = "1.0.228", features = ["derive","rc"] }
+shellexpand = "3.1.1"
+simple-logging = "2.0.2"
+slurm-spank = "0.4.0"
+toml = "0.9.5"
+tracing = "0.1"
+tracing-subscriber = "0.3.23"
+users = "0.11.0"
