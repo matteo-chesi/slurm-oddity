@@ -2,9 +2,10 @@ use std::error::Error;
 
 use slurm_spank::{Context, Plugin, SpankHandle};
 
-use crate::{SpankStage0, run_stage1, task_init_adjust};
+use crate::{SpankStage0, run_stage1, task_init_adjust, task_init_set_job_uid, task_init_revert_uid};
 use crate::args::*;
 use crate::config::{dispatch_load_config};
+use crate::state::{dispatch_load_state};
 
 unsafe impl Plugin for SpankStage0 {
     fn init(&mut self, spank: &mut SpankHandle) -> Result<(), Box<dyn Error>> {
@@ -40,8 +41,26 @@ unsafe impl Plugin for SpankStage0 {
         }
 
         dispatch_load_config(self, spank)?;
+        dispatch_load_state(self, spank)?;
         let _ = register_plugin_args(spank)?;
+
+        /*
+        match spank.context()? { 
+            Context::Remote => {
+                task_init_set_job_uid(self, spank)?;
+            }
+            _ => {},
+        }
+        */
         run_stage1(self, spank, context, function, payload);
+        /*
+        match spank.context()? { 
+            Context::Remote => {
+                task_init_revert_uid(self, spank)?;
+            }
+            _ => {},
+        }
+        */
 
         Ok(())
     }

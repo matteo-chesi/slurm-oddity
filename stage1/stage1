@@ -78,11 +78,24 @@ function check_environment() {
 }
 
 function execute() {
+  if [ "${SPANK_FUNCTION}" == "init" ] && [ "${SPANK_CONTEXT}" == "remote" ]
+  then
+    ENV_SLURM_OUT="$(env | grep -E "^SLURM")"    
+    log "ID_OUT: $(id)"	  
+    log "HOME: ${HOME}"	  
+    log "USER: ${USER}"	  
+    log "PATH: ${PATH}"	  
+    log "PWD: $(pwd)"
+    echo "${ENV_SLURM_OUT}" | while read line
+    do
+      log "${line}"
+    done   
+  fi 
   if [ -z "${SPANK_PAYLOAD}" ]
   then
-    log "Executed: Context ${SPANK_CONTEXT} - Function ${SPANK_FUNCTION}"
-  else	  
-    log "Executed: Context ${SPANK_CONTEXT} - Function ${SPANK_FUNCTION} - PAYLOAD ${SPANK_PAYLOAD}"
+    log "Executed  as \"${EXE_USER}\" : Context ${SPANK_CONTEXT} - Function ${SPANK_FUNCTION}"
+  else
+    log "Executed  as \"${EXE_USER}\" : Context ${SPANK_CONTEXT} - Function ${SPANK_FUNCTION} - Payload ${SPANK_PAYLOAD}"
   fi
   #echo "stage1-v${VERSION} - Context ${SPANK_CONTEXT} - Function ${SPANK_FUNCTION} - PAYLOAD ${SPANK_PAYLOAD} - EXECUTED"
   #TIMESTAMP=$(date +%Y-%m-%dT%H:%M:%S.%3N)
@@ -97,13 +110,20 @@ then
 else
   LOG_DIR="${HOME}/cosmodrome/${NODENAME}" 
 fi
+
+if [ -n "${SLURM_STAGE0_JOBID}" ]
+then
+  LOG_DIR="${LOG_DIR}/job_${SLURM_STAGE0_JOBID}"	
+fi
+
 LOG_FILE="${LOG_DIR}/stage1.log"
 SCRIPT_DIR="$(readlink -f $(dirname $0))"
 SCRIPT_NAME="$(basename $0)"
 SCRIPT_ARGS="$@"
+EXE_USER=$(id -un)
 
 [ ! -d ${LOG_DIR} ] && mkdir -p ${LOG_DIR}
-log "Executing: ${SCRIPT_DIR}/${SCRIPT_NAME} ${SCRIPT_ARGS}"
+log "Executing as \"${EXE_USER}\" : ${SCRIPT_DIR}/${SCRIPT_NAME} ${SCRIPT_ARGS}"
 parse_args $@
 check_environment 
 execute

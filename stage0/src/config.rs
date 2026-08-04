@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use serde::{Serialize, Deserialize};
 use slurm_spank::{Context, SpankHandle};
 
-use crate::{SpankStage0, get_log_dirpath, log, log_error, remote_log, spank_getenv};
+use crate::{SpankStage0, log, log_error, remote_log, spank_getenv};
 
 const CONFIGFILE_PATH: &str = "/etc/cosmodrome-stage0.conf";
 
@@ -154,14 +154,8 @@ pub(crate) fn local_load_config(
         }
     };
 
-    let mut key = "SLURM_STAGE0_LOGDIR";
-    let mut value = get_log_dirpath();
-    unsafe {
-        std::env::set_var(key, OsStr::new(&value));
-    }
-
-    key = "SLURM_STAGE1_USER_BIN";
-    value = config.stage1_user_path.clone();
+    let mut key = "SLURM_STAGE1_USER_BIN";
+    let mut value = config.stage1_user_path.clone();
     unsafe {
         std::env::set_var(key, OsStr::new(&value));
     }

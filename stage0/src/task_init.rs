@@ -2,6 +2,7 @@ use std::error::Error;
 use std::ffi::OsStr;
 use std::process::Command;
 use users::get_current_uid;
+use libc::{self, gid_t, uid_t};
 
 use slurm_spank::SpankHandle;
 
@@ -93,3 +94,50 @@ fn task_init_adjust_config(
 
     Ok(())
 }
+
+pub(crate) fn task_init_set_job_uid(
+    plugin: &mut SpankStage0,
+    spank: &mut SpankHandle,
+) -> Result<(), Box<dyn Error>> {
+
+    let key = "SLURM_STAGE0_UID";
+    let job_uid = spank.job_uid()?;
+    unsafe {
+        std::env::set_var(key, OsStr::new(&job_uid.to_string()));
+    }
+
+    let cur_uid = get_current_uid();
+    if cur_uid == 0 && cur_uid != job_uid {
+        unsafe {
+            let rc = libc::setuid(job_uid);
+            if rc != 0 {
+                return Err(format!("Error switching user id from {cur_uid} to {job_uid}").into());
+            }
+            plugin.state.old_uid = Some(cur_uid);
+        }
+    }
+    Ok(())
+}
+pub(crate) fn task_init_revert_uid(
+    plugin: &mut SpankStage0,
+    spank: &mut SpankHandle,
+) -> Result<(), Box<dyn Error>> {
+    let cur_uid = get_current_uid();
+    
+    let old_uid = match plugin.state.old_uid {
+        Some(uid) => uid,
+        None => return Ok(()),
+    };
+
+    if cur_uid != 0 && old_uid == 0 {
+        unsafe {
+            let rc = libc::setuid(old_uid);
+            if rc != 0 {
+                return Err(format!("Error reverting user id from {cur_uid} to {old_uid}").into());
+            }
+            plugin.state.old_uid = None;
+        }
+    }
+    Ok(())
+}
+

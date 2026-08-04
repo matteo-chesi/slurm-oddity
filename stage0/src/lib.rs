@@ -7,7 +7,7 @@ use crate::state::Stage0State;
 
 pub(crate) use crate::log::{log, remote_log, get_log_dirpath};
 pub(crate) use crate::stage1::run_stage1;
-pub(crate) use crate::task_init::task_init_adjust;
+pub(crate) use crate::task_init::{task_init_adjust, task_init_set_job_uid, task_init_revert_uid};
 
 pub mod args;
 pub mod config;
