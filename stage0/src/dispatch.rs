@@ -142,6 +142,7 @@ unsafe impl Plugin for SpankStage0 {
         Ok(())
     }
 
+    /*
     fn slurmd_exit(&mut self, spank: &mut SpankHandle) -> Result<(), Box<dyn Error>> {
         //if !self.config.skybox_enabled {
         //    return Ok(());
@@ -155,6 +156,7 @@ unsafe impl Plugin for SpankStage0 {
         run_stage1(self, spank, context, function, payload);
         Ok(())
     }
+    */
 
     fn task_exit(&mut self, spank: &mut SpankHandle) -> Result<(), Box<dyn Error>> {
         //if !self.config.skybox_enabled {
