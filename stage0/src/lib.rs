@@ -7,7 +7,6 @@ use crate::state::Stage0State;
 
 pub(crate) use crate::log::{log, remote_log, get_log_dirpath};
 pub(crate) use crate::stage1::run_stage1;
-pub(crate) use crate::task_init::{task_init_adjust, task_init_set_job_uid, task_init_revert_uid};
 
 pub mod args;
 pub mod config;
@@ -15,7 +14,6 @@ pub mod dispatch;
 pub mod log;
 pub mod stage1;
 pub mod state;
-pub mod task_init;
 
 //pub(crate) const SLURM_BATCH_SCRIPT: u32 = 0xfffffffb;
 pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -54,3 +52,11 @@ pub(crate) fn spank_getenv(spank: &mut SpankHandle, var: &str) -> String {
         Err(_) => String::from(""),
     }
 }
+/*
+pub(crate) fn spank_setenv(spank: &mut SpankHandle, name: &str, value: &str) -> Result<(),String> {
+    match spank.setenv(name, value, true) {
+        Ok(r) => Ok(r),
+        Err(_) => { return Err(format!("Cannot set variable {}={}", name, value)); },
+    }
+}
+*/

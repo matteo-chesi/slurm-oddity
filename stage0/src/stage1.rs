@@ -35,12 +35,6 @@ fn local_run_stage1(stage0: &mut SpankStage0, _spank: &mut SpankHandle, context:
     let cmdname;
     if cur_uid == 0 {
         return;
-        if ! Path::new(&stage0.config.stage1_system_path).exists() {
-            log(format!("ERROR: cannot find stage1 executable at \"{}\"", &stage0.config.stage1_system_path).as_str());
-            return;
-        } else {
-            cmdname = &stage0.config.stage1_system_path;
-        }
     } else {
         if ! Path::new(&stage0.config.stage1_user_path).exists() {
             if ! Path::new(&stage0.config.stage1_system_path).exists() {
@@ -109,6 +103,7 @@ fn remote_run_stage1(stage0: &mut SpankStage0, spank: &mut SpankHandle, context:
     remote_log(stage0, spank, &format!("[UID: {}] Calling: {}", &cur_uid, &fstr));
 
     let cmdname;
+    let cmd2run;
     let mut cmdargs = vec![];
     let mut cmdstr;
     let username;
@@ -117,28 +112,35 @@ fn remote_run_stage1(stage0: &mut SpankStage0, spank: &mut SpankHandle, context:
         if stage0.state.username.is_none() {
             return;
         }
-        if ! Path::new(&stage0.config.stage1_system_path).exists() {
-            remote_log(stage0, spank, format!("ERROR: cannot find stage1 executable at \"{}\"", &stage0.config.stage1_system_path).as_str());
-            return;
-        } else {
-            cmdname = String::from("/usr/bin/su");
-            username = stage0.state.username.clone().unwrap();
-            if payload.is_some() {
-                pl = payload.clone().unwrap();
-                innercmd = format!("{} --context {} --function {} --payload {}", &stage0.config.stage1_system_path.clone(), &context, &function, pl.as_str());
-                cmdargs = vec![
-                    "-l", &username,
-                    "-c", &innercmd,
-                ];
-                cmdstr = format!("{} -l {} -c {} --context {} --function {} --payload {}", &cmdname, &username, &stage0.config.stage1_system_path.clone() ,&context, &function, pl.as_str());
+        
+        if ! Path::new(&stage0.config.stage1_user_path).exists() {
+            if ! Path::new(&stage0.config.stage1_system_path).exists() {
+                remote_log(stage0, spank, format!("ERROR: cannot find stage1 executable at \"{}\"", &stage0.config.stage1_system_path).as_str());
+                return;
             } else {
-                innercmd = format!("{} --context {} --function {}", &stage0.config.stage1_system_path.clone(), &context, &function);
-                cmdargs = vec![
-                    "-l", &username,
-                    "-c", &innercmd,
-                ];
-                cmdstr = format!("{} -l {} -c {} --context {} --function {}", &cmdname, &username, &stage0.config.stage1_system_path.clone(), &context, &function);
+                cmd2run = stage0.config.stage1_system_path.clone();
             }
+        } else {
+            cmd2run = stage0.config.stage1_user_path.clone();
+        }
+
+        cmdname = String::from("/usr/bin/su");
+        username = stage0.state.username.clone().unwrap();
+        if payload.is_some() {
+            pl = payload.clone().unwrap();
+            innercmd = format!("{} --context {} --function {} --payload {}", &cmd2run, &context, &function, pl.as_str());
+            cmdargs = vec![
+                &username,
+                "-c", &innercmd,
+            ];
+            cmdstr = format!("{} {} -c {} --context {} --function {} --payload {}", &cmdname, &username, &cmd2run ,&context, &function, pl.as_str());
+        } else {
+            innercmd = format!("{} --context {} --function {}", &cmd2run, &context, &function);
+            cmdargs = vec![
+                &username,
+                "-c", &innercmd,
+            ];
+            cmdstr = format!("{} {} -c {} --context {} --function {}", &cmdname, &username, &cmd2run, &context, &function);
         }
     } else {
         if ! Path::new(&stage0.config.stage1_user_path).exists() {

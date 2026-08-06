@@ -7,11 +7,10 @@ use std::path::PathBuf;
 use chrono::Utc;
 use chrono_tz::Tz;
 use gethostname::gethostname;
-use nix::unistd::{Uid, setfsuid};
 
 use slurm_spank::{SpankHandle};
 
-use crate::{get_versioned_plugin_name, spank_getenv};
+use crate::{get_versioned_plugin_name};
 use crate::SpankStage0;
 
 pub(crate) fn log(arg: &str) {
@@ -30,21 +29,54 @@ pub(crate) fn get_log_dirpath() -> String {
     return log_dirpath.into_os_string().to_string_lossy().to_string();
 }
 
-pub(crate) fn remote_log(plugin: &mut SpankStage0, spank: &mut SpankHandle, arg: &str) {
+pub(crate) fn remote_log(plugin: &mut SpankStage0, _spank: &mut SpankHandle, arg: &str) {
 
+    let value = match &plugin.state.stage0_logdir_path {
+        Some(l) => l,
+        None => &get_log_dirpath(),
+    };
+
+    /*
     let key = "SLURM_STAGE0_LOGDIR";
     let mut value = spank_getenv(spank, key);
     if value.is_empty() {
         value = get_log_dirpath();
     }
-    let mut log_dirpath = std::path::PathBuf::from(value);
+    */
+
+    let log_dirpath = std::path::PathBuf::from(value);
     let hostname = gethostname()
         .into_string()
         .unwrap_or(String::from("unknown_hostname"));
     let log_node_dirpath = log_dirpath.join(std::path::PathBuf::from(hostname.clone()));
     
+    if ! log_node_dirpath.parent().unwrap().exists() {
+        match create_dir_all(&log_node_dirpath.parent().unwrap()) {
+            Ok(_) => (),
+            Err(_) => {
+                return;
+            },
+        }
+    }
+    if plugin.state.uid.is_some() && ( std::fs::metadata(&log_node_dirpath.parent().unwrap()).unwrap().uid() != plugin.state.uid.unwrap() ) {
+        match chown(&log_node_dirpath.parent().unwrap(), plugin.state.uid, plugin.state.gid) {
+            Ok(_) => (),
+            Err(_) => {
+                return;
+            },
+        }
+    }
+    if plugin.state.gid.is_some() && ( std::fs::metadata(&log_node_dirpath.parent().unwrap()).unwrap().gid() != plugin.state.gid.unwrap() ) {
+        match chown(&log_node_dirpath.parent().unwrap(), plugin.state.uid, plugin.state.gid) {
+            Ok(_) => (),
+            Err(_) => {
+                return;
+            },
+        }
+    }
+    
     if ! log_node_dirpath.exists() {
-        match create_dir_all(&log_dirpath) {
+        match create_dir_all(&log_node_dirpath) {
             Ok(_) => (),
             Err(_) => {
                 return;
@@ -68,6 +100,7 @@ pub(crate) fn remote_log(plugin: &mut SpankStage0, spank: &mut SpankHandle, arg:
         }
     }
 
+    /*
     log_dirpath = match &plugin.state.jobid {
         Some(j) => {
             let dirname = format!("job_{}", j);
@@ -100,10 +133,15 @@ pub(crate) fn remote_log(plugin: &mut SpankStage0, spank: &mut SpankHandle, arg:
         },
         None => log_node_dirpath,
     };
+    
     let log_filepath = log_dirpath
         .join(std::path::PathBuf::from("stage0.log"));
+    */
+    let log_filepath = log_node_dirpath
+        .join(std::path::PathBuf::from("stage0.log"));
 
-    let mut file = OpenOptions::new()
+
+    let _file = OpenOptions::new()
         .write(true)
         .append(true)
         .create(true)
@@ -126,7 +164,8 @@ pub(crate) fn remote_log(plugin: &mut SpankStage0, spank: &mut SpankHandle, arg:
             },
         }
     }
-    stage0_log(log_dirpath, hostname, arg);
+    //stage0_log(log_dirpath, hostname, arg);
+    stage0_log(log_node_dirpath, hostname, arg);
 }
 
 fn stage0_log(log_dirpath: PathBuf, hostname: String, arg: &str) {

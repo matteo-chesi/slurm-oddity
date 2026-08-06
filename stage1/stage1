@@ -78,42 +78,35 @@ function check_environment() {
 }
 
 function execute() {
-  if [ "${SPANK_FUNCTION}" == "init" ] && [ "${SPANK_CONTEXT}" == "remote" ]
-  then
-    ENV_SLURM_OUT="$(env | grep -E "^SLURM")"    
-    log "ID_OUT: $(id)"	  
-    log "HOME: ${HOME}"	  
-    log "USER: ${USER}"	  
-    log "PATH: ${PATH}"	  
-    log "PWD: $(pwd)"
-    echo "${ENV_SLURM_OUT}" | while read line
-    do
-      log "${line}"
-    done   
-  fi 
+  #if [ "${SPANK_FUNCTION}" == "init" ] && [ "${SPANK_CONTEXT}" == "remote" ]
+  #then
+  #  ENV_SLURM_OUT=$(env | grep -E '^SLURM|^STIKAZZI')
+  #  log "ID_OUT: $(id)"	  
+  #  log "HOME: ${HOME}"	  
+  #  log "USER: ${USER}"	  
+  #  log "PATH: ${PATH}"	  
+  #  log "PWD: $(pwd)"
+  #  echo "${ENV_SLURM_OUT}" | while read line
+  #  do
+  #    log "${line}"
+  #  done   
+  #fi 
   if [ -z "${SPANK_PAYLOAD}" ]
   then
     log "Executed  as \"${EXE_USER}\" : Context ${SPANK_CONTEXT} - Function ${SPANK_FUNCTION}"
   else
     log "Executed  as \"${EXE_USER}\" : Context ${SPANK_CONTEXT} - Function ${SPANK_FUNCTION} - Payload ${SPANK_PAYLOAD}"
   fi
-  #echo "stage1-v${VERSION} - Context ${SPANK_CONTEXT} - Function ${SPANK_FUNCTION} - PAYLOAD ${SPANK_PAYLOAD} - EXECUTED"
-  #TIMESTAMP=$(date +%Y-%m-%dT%H:%M:%S.%3N)
-  #echo "[${TIMESTAMP}] stage1-v${VERSION} - Context ${SPANK_CONTEXT} - Function ${SPANK_FUNCTION} - PAYLOAD ${SPANK_PAYLOAD} - EXECUTED" >>${LOG_FILE}
 }
 
 VERSION='0.1a'
 NODENAME="${HOSTNAME}"
+
 if [ -n "${SLURM_STAGE0_LOGDIR}" ]
 then
   LOG_DIR="${SLURM_STAGE0_LOGDIR}/${NODENAME}" 
 else
   LOG_DIR="${HOME}/cosmodrome/${NODENAME}" 
-fi
-
-if [ -n "${SLURM_STAGE0_JOBID}" ]
-then
-  LOG_DIR="${LOG_DIR}/job_${SLURM_STAGE0_JOBID}"	
 fi
 
 LOG_FILE="${LOG_DIR}/stage1.log"

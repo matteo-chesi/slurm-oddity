@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use slurm_spank::{Context, SpankHandle};
 
-use crate::{SpankStage0, get_log_dirpath, log, log_error, remote_log, spank_getenv};
+use crate::{SpankStage0, get_log_dirpath, log, remote_log, spank_getenv};
 
 #[derive(Serialize, Deserialize)]
 pub(crate) struct Stage0State {
@@ -102,7 +102,21 @@ pub(crate) fn remote_load_state(
     spank: &mut SpankHandle,
 ) -> Result<(), Box<dyn Error>> {
 
-    let mut key = "SLURM_STAGE0_LOGDIR";
+    let mut key = "SLURM_STAGE0_JOBID";
+    plugin.state.jobid = match spank.job_id() {
+        Ok(id) => {
+            let strid = id.to_string();
+            unsafe {std::env::set_var(key, OsStr::new(&strid));}
+            remote_log(plugin, spank, &format!("STAGE0_JOBID: {}", strid));
+            Some(strid)
+        },
+        Err(_) => {
+            unsafe {std::env::remove_var(key);}
+            None
+        },
+    };
+    
+    key = "SLURM_STAGE0_LOGDIR";
     let mut value = spank_getenv(spank, key).to_string();
     plugin.state.stage0_logdir_path = match value.as_str() {
         "None" => {
@@ -110,8 +124,13 @@ pub(crate) fn remote_load_state(
             None
         },
         _ => {
-            unsafe {std::env::set_var(key, OsStr::new(&value));}
-            Some(value.clone())
+            let mut log_dirpath = std::path::PathBuf::from(&value);
+            if plugin.state.jobid.is_some() {
+                let dirname = format!("job_{}", &plugin.state.jobid.clone().unwrap());
+                log_dirpath = log_dirpath.join(std::path::PathBuf::from(&dirname));
+            }
+            unsafe {std::env::set_var(key, OsStr::new(&log_dirpath));}
+            Some(log_dirpath.clone().into_os_string().into_string().unwrap())
         },
     };
     remote_log(plugin, spank, &format!("STAGE0_LOGDIR: {}", value));
@@ -130,20 +149,6 @@ pub(crate) fn remote_load_state(
     };
     remote_log(plugin, spank, &format!("STAGE0_USERNAME: {}", value));
 
-    key = "SLURM_STAGE0_JOBID";
-    plugin.state.jobid = match spank.job_id() {
-        Ok(id) => {
-            let strid = id.to_string();
-            unsafe {std::env::set_var(key, OsStr::new(&strid));}
-            remote_log(plugin, spank, &format!("STAGE0_JOBID: {}", strid));
-            Some(strid)
-        },
-        Err(_) => {
-            unsafe {std::env::remove_var(key);}
-            None
-        },
-    };
-    
     key = "SLURM_STAGE0_UID";
     plugin.state.uid = match spank.job_uid() {
         Ok(uid) => {
