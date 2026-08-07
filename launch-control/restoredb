@@ -1,0 +1,48 @@
+#!/usr/bin/bash
+
+INPUT_SOURCE="$1"
+BASE_DIR=$(readlink -f $(dirname $0))
+DB_DIR="${BASE_DIR}/db"
+DATABASE="${DB_DIR}/launch-control.db"
+TIMESTAMP=$(date +%Y%m%dT%H%M%S)
+DATABASE_BKP="${DB_DIR}/launch-control-bkp-${TIMESTAMP}.db"
+DATABASE_NAME=$(basename $DATABASE)
+DATABASE_BKP_NAME=$(basename $DATABASE_BKP)
+
+function help() {
+  cat >&2 <<EOF
+Usage:
+
+./$(basename $0) <DB_SQL_DUMP_FILEPATH.sql> or <DB_BACKUP_FILEPATH.db>
+EOF
+}
+
+[ -z "${INPUT_SOURCE}" ] && help && exit 1
+[ ! -f "${INPUT_SOURCE}" ] && echo "ERROR: $INPUT_SOURCE is not a file." >&2 && exit 1
+INPUT_SOURCE_NAME=$(basename $INPUT_SOURCE)
+
+if [[ "${INPUT_SOURCE}" == *.db ]]
+then
+  if [ -f "${DATABASE}" ]
+  then	 
+    echo "Saving database ${DATABASE_NAME} as ${DATABASE_BKP_NAME}"
+    cp -a ${DATABASE} ${DATABASE_BKP}
+  fi
+
+  echo "Restoring database copy at ${INPUT_SOURCE_NAME} as ${DATABASE_NAME}"
+  cp ${INPUT_SOURCE} ${DATABASE}.restoring || exit 1
+  mv ${DATABASE}.restoring ${DATABASE} || exit 1
+elif [[ "${INPUT_SOURCE}" == *.sql ]]
+then
+  if [ -f "${DATABASE}" ]
+  then	 
+    echo "Saving database ${DATABASE_NAME} as ${DATABASE_BKP_NAME}"
+    cp ${DATABASE} ${DATABASE_BKP}
+  fi
+
+  echo "Restoring database SQL dump at ${INPUT_SOURCE_NAME} as ${DATABASE_NAME}"
+  sqlite3 ${DATABASE}.restoring < ${INPUT_SOURCE} || exit 1
+  mv ${DATABASE}.restoring ${DATABASE} || exit 1
+else
+  echo "ERROR: $INPUT_SOURCE_NAME filename doesn't end with .sql or .db" >&2 && exit 1
+fi	
