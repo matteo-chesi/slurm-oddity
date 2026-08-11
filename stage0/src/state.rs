@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::ffi::OsStr;
+use gethostname::gethostname;
 use serde::{Deserialize, Serialize};
 
 use slurm_spank::{Context, SpankHandle};
@@ -16,6 +17,7 @@ pub(crate) struct Stage0State {
     pub(crate) uid: Option<u32>,
     pub(crate) gid: Option<u32>,
     pub(crate) jobid: Option<String>,
+    pub(crate) caller_id: Option<String>,
 }
 
 impl Default for Stage0State {
@@ -29,6 +31,7 @@ impl Default for Stage0State {
             uid: None,
             gid: None,
             jobid: None,
+            caller_id: None,
         }
     }
 }
@@ -94,6 +97,24 @@ pub(crate) fn local_load_state(
     };
     log(&format!("STAGE0_USERNAME: {}", username));
 
+    key = "SLURM_STAGE0_CALLER_ID";
+    let pid = std::process::id();
+    let hostname = gethostname()
+        .into_string()
+        .unwrap_or(String::from("unknown_hostname"));
+
+    value = format!("{hostname}_pid_{pid}");
+    unsafe {
+        std::env::set_var(key, OsStr::new(&value));
+    }
+    plugin.state.caller_id = Some(value);
+
+    let caller_id = match &plugin.state.caller_id {
+        Some(u) => u,
+        None => &String::from("None"),
+    };
+    log(&format!("STAGE0_CALLER_ID: {}", caller_id));
+
     Ok(())
 }
 
@@ -115,7 +136,7 @@ pub(crate) fn remote_load_state(
             None
         },
     };
-    
+
     key = "SLURM_STAGE0_LOGDIR";
     let mut value = spank_getenv(spank, key).to_string();
     plugin.state.stage0_logdir_path = match value.as_str() {
@@ -176,6 +197,47 @@ pub(crate) fn remote_load_state(
             None
         },
     };
+
+    key = "SLURM_STAGE0_CALLER_ID";
+    let hostname = gethostname()
+        .into_string()
+        .unwrap_or(String::from("unknown_hostname"));
+
+    let mut value = format!("{hostname}");
+
+    match spank.job_id() {
+        Ok(id) => {
+            value = format!("{value}_job_{id}");
+        },
+        Err(_) => {
+            value = format!("{value}_job_unknown");
+        },
+    }
+
+    match spank.job_stepid() {
+        Ok(id) => {
+            value = format!("{value}_step_{id}");
+        },
+        Err(_) => {},
+    }
+
+    match spank.task_id() {
+        Ok(id) => {
+            value = format!("{value}_task_{id}");
+        },
+        Err(_) => {},
+    }
+
+    unsafe {
+        std::env::set_var(key, OsStr::new(&value));
+    }
+    plugin.state.caller_id = Some(value);
+
+    let caller_id = match &plugin.state.caller_id {
+        Some(u) => u,
+        None => &String::from("None"),
+    };
+    remote_log(plugin, spank, &format!("STAGE0_CALLER_ID: {}", caller_id));
 
     Ok(())
 }
