@@ -19,10 +19,12 @@ unsafe impl Plugin for SpankStage0 {
 
         match spank.context()? {
             
+            /*
             Context::Slurmd => {
                 //let _ = slurmd_init(self, spank)?;
                 context  = String::from("slurmd");
             }
+            */
             
             Context::Local => {
                 //let _ = srun_init(self, spank)?;
@@ -40,8 +42,10 @@ unsafe impl Plugin for SpankStage0 {
             _ => { return Ok(()); }
         }
 
-        dispatch_load_config(self, spank)?;
+        // Required to understand where to log.
         dispatch_load_state(self, spank)?;
+        dispatch_load_config(self, spank)?;
+
 
         let _ = register_plugin_args(spank)?;
 
@@ -103,6 +107,8 @@ unsafe impl Plugin for SpankStage0 {
         let context  = String::from("remote");
         let function = String::from("task_init");
         let payload = self.args.payload.clone();
+        
+        dispatch_load_state(self, spank)?;
 
         //slurmstepd_task_init(self, spank)
         //task_init_adjust(self, spank)?;

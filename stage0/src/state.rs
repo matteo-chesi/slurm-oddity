@@ -1,11 +1,18 @@
+use std::collections::HashMap;
+use std::env::set_var;
 use std::error::Error;
 use std::ffi::OsStr;
+use std::fs::read_to_string;
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
 use gethostname::gethostname;
 use serde::{Deserialize, Serialize};
 
 use slurm_spank::{Context, SpankHandle};
+use raster::{expand_vars_string};
 
-use crate::{SpankStage0, get_log_dirpath, log, remote_log, spank_getenv};
+use crate::{CACHE_PATH, LOCAL2REMOTE_VARNAME, LOCAL2REMOTE_FILENAME, create_dir_path, SpankStage0, get_log_dirpath, log, remote_log, spank_getenv};
 
 #[derive(Serialize, Deserialize)]
 pub(crate) struct Stage0State {
@@ -18,6 +25,7 @@ pub(crate) struct Stage0State {
     pub(crate) gid: Option<u32>,
     pub(crate) jobid: Option<String>,
     pub(crate) caller_id: Option<String>,
+    pub(crate) job_env: HashMap<String, String>,
 }
 
 impl Default for Stage0State {
@@ -32,6 +40,7 @@ impl Default for Stage0State {
             gid: None,
             jobid: None,
             caller_id: None,
+            job_env: HashMap::from([]),
         }
     }
 }
@@ -128,7 +137,6 @@ pub(crate) fn remote_load_state(
         Ok(id) => {
             let strid = id.to_string();
             unsafe {std::env::set_var(key, OsStr::new(&strid));}
-            remote_log(plugin, spank, &format!("STAGE0_JOBID: {}", strid));
             Some(strid)
         },
         Err(_) => {
@@ -154,7 +162,10 @@ pub(crate) fn remote_load_state(
             Some(log_dirpath.clone().into_os_string().into_string().unwrap())
         },
     };
+    // We need the JobID to build the folder name.
     remote_log(plugin, spank, &format!("STAGE0_LOGDIR: {}", value));
+    //Moved here because we need to know the folder to log in
+    remote_log(plugin, spank, &format!("STAGE0_JOBID: {}", &plugin.state.jobid.clone().unwrap()));
 
     key = "SLURM_STAGE0_USERNAME";
     value = spank_getenv(spank, key).to_string();
@@ -239,5 +250,140 @@ pub(crate) fn remote_load_state(
     };
     remote_log(plugin, spank, &format!("STAGE0_CALLER_ID: {}", caller_id));
 
+    key = LOCAL2REMOTE_VARNAME;
+    value = spank_getenv(spank, key).to_string();
+    match value.as_str() {
+        "None" => {
+            unsafe {std::env::remove_var(key);}
+        },
+        _ => {
+            unsafe {std::env::set_var(key, OsStr::new(&value));}
+        },
+    }
+    remote_log(plugin, spank, &format!("{}: {}", key, value));
+
+    // Translate job env
+    remote_log(plugin, spank, &format!("STIKKAZZI"));
+    let hm = get_job_env(spank);
+    plugin.state.job_env = hm.clone();
+    
+    // Write input.json
+    jobenv2cache(plugin, spank); 
+    remote_log(plugin, spank, &format!("AMMAZZI"));
+    
+    
+    for (k,v) in hm.clone() {
+        remote_log(plugin, spank, &format!("JOBENV VARIABLE: {k} = {v}",));
+    }
+
     Ok(())
+}
+
+pub(crate) fn get_job_env(spank: &mut SpankHandle) -> HashMap<String,String> {
+    let vec = match spank.job_env() {
+        Ok(v) => v.clone(),
+        Err(_) => [].to_vec(),
+    };
+    let mut h: HashMap<String,String> = HashMap::from([]);
+    for v in vec.into_iter() {
+        let (key, value) = v.split_once("=").unwrap();
+        h.insert(key.to_string(), value.to_string());
+    };
+
+    // Integrate if needed
+    if h.get("SLURM_NODEID").is_none() {
+        let nodeid = match spank.job_nodeid() {
+            Ok(nid) => Some(nid),
+            Err(_) => None,
+        };
+        if nodeid.is_some() {
+            let nodestr = nodeid.unwrap().to_string();
+            h.insert("SLURM_NODEID".to_string(), nodestr); 
+        }
+    }
+
+    return h;
+}
+
+pub(crate) fn get_cache_dir_path(plugin: &mut SpankStage0) -> String {
+    let jobenv = plugin.state.job_env.clone();
+    let opt_jobenv;
+    if jobenv.len() == 0 {
+        opt_jobenv = None;
+    } else {
+        opt_jobenv = Some(jobenv);
+    }
+
+    let cache_path = expand_vars_string(CACHE_PATH.to_string(), &opt_jobenv).unwrap();
+
+    // Collect CALLER_ID
+    let caller_id = match &plugin.state.caller_id {
+        Some(u) => u,
+        None => {
+            return String::from("");
+        },
+    };
+
+    let cache_dirname = caller_id;
+    let cache_dir_path = format!("{cache_path}/{cache_dirname}");
+    return cache_dir_path;
+}
+
+pub(crate) fn set_local2remote_env_var(plugin: &mut SpankStage0) {
+    // Check file existence
+    let cache_dir_path = get_cache_dir_path(plugin);
+    let file_path_str = format!("{cache_dir_path}/{LOCAL2REMOTE_FILENAME}");
+    let file_path = Path::new(&file_path_str);
+    log(&format!("HERE: {}", file_path_str));
+
+    if ! file_path.exists() {
+        return;
+    };
+    log(&format!("THERE"));
+
+    let content = match read_to_string(file_path) {
+        Ok(c) => c,
+        Err(_) => {
+            return;
+        },
+    };
+    log(&format!("MORE:\n{}", content));
+
+    unsafe {
+        set_var(LOCAL2REMOTE_VARNAME, OsStr::new(&content));
+    }
+    log(&format!("MORE THAN EVER"));
+}
+
+pub(crate) fn jobenv2cache(plugin: &mut SpankStage0, spank: &mut SpankHandle) {
+
+    remote_log(plugin, spank, &format!("STIKKAZZI"));
+    let cache_dir_path = get_cache_dir_path(plugin);
+    let _ = create_dir_path(plugin, Path::new(&cache_dir_path));
+    let cache_file_path = format!("{cache_dir_path}/jobenv.json");
+    remote_log(plugin, spank, &format!("FILE: {}", cache_file_path));
+
+    let content = match serde_json::to_string(&plugin.state.job_env) {
+        Ok(s) => s,
+        Err(_) => {
+            panic!("Cannot serialize jobenv to json");
+        }
+    };
+
+    let mut file = match File::create(&cache_file_path) {
+        Ok(f) => f,
+        Err(_) => {
+            panic!("Cannot open {cache_file_path}");
+        }
+    };
+
+    let _ = match file.write_all(content.as_bytes()) {
+        Ok(f) => f,
+        Err(_) => {
+            panic!("Cannot write to {cache_file_path}");
+        }
+    };
+    let _ = file.flush();
+    let _ = file.sync_all();
+    remote_log(plugin, spank, &format!("BIGAZZI"));
 }

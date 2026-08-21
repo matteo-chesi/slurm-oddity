@@ -1,10 +1,13 @@
+use std::env::{current_dir, set_current_dir, set_var};
+use std::ffi::OsStr;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 use users::get_current_uid;
 
 use slurm_spank::{Context, SpankHandle};
 
-use crate::{SpankStage0, log, remote_log};
+use crate::{SpankStage0, log, remote_log, set_local2remote_env_var, spank_getenv};
 
 pub(crate) fn run_stage1(stage0: &mut SpankStage0, spank: &mut SpankHandle, context: String, function: String, payload: Option<String>) {
 
@@ -89,6 +92,11 @@ fn local_run_stage1(stage0: &mut SpankStage0, _spank: &mut SpankHandle, context:
             log(&format!("stderr: {}", line));
         }
     };
+    
+    if function == "init_post_opt" {
+        set_local2remote_env_var(stage0);
+    }
+
 }
 
 fn remote_run_stage1(stage0: &mut SpankStage0, spank: &mut SpankHandle, context: String, function: String, payload: Option<String>) {
@@ -101,6 +109,17 @@ fn remote_run_stage1(stage0: &mut SpankStage0, spank: &mut SpankHandle, context:
         fstr = format!("{}({},{},{})", "run_stage1", context, function, pl.as_str())
     }
     remote_log(stage0, spank, &format!("[UID: {}] Calling: {}", &cur_uid, &fstr));
+
+    let prev_dir = match current_dir() {
+        Ok(d) => d,
+        Err(_) => PathBuf::from("/"),
+    };
+    let cur_dir = spank_getenv(spank, "PWD");
+    let _ = set_current_dir(cur_dir);
+    
+    if function == "task_init" {
+        set_job_home_env_var(spank);
+    }
 
     let cmdname;
     let cmd2run;
@@ -194,4 +213,15 @@ fn remote_run_stage1(stage0: &mut SpankStage0, spank: &mut SpankHandle, context:
             remote_log(stage0, spank, &format!("stderr: {}", line));
         }
     };
+    
+    let _ = set_current_dir(prev_dir);
+}
+
+fn set_job_home_env_var(spank: &mut SpankHandle) {
+    let home_dir = spank_getenv(spank, "HOME");
+    if home_dir != "" {
+        unsafe {
+            set_var("HOME", OsStr::new(&home_dir));
+        }
+    }
 }

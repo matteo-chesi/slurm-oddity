@@ -9,11 +9,13 @@ use std::time::Duration;
 use serde_json::{map::Entry, Value};
 use url::Url;
 use users::{get_current_groupname};
+use regex::Regex;
 
 use raster::{Config, config::ConfigHooks as ConfigHooks, load_config as raster_load_config};
 use crate::{AutoUpdate, auto_update, create_dir_path, get_cache_dir_path, log};
 
 pub(crate) fn load_config() -> Config {
+    //print_home();
     let mut config = match cache2config() {
         Ok(cfg) => {
             return cfg;
@@ -37,6 +39,7 @@ fn config2cache(config: &Config) {
 
     let cache_dir_path = get_cache_dir_path();
     let _ = create_dir_path(Path::new(&cache_dir_path));
+
     let config_cache_file_path = format!("{cache_dir_path}/config.json");
 
     let config_content = match serde_json::to_string(&config) {
@@ -63,7 +66,13 @@ fn config2cache(config: &Config) {
 
 fn cache2config() -> Result<Config, String> {
     let cache_dir_path = get_cache_dir_path();
-    let config_cache_file_path = format!("{cache_dir_path}/config.json");
+    let mut config_cache_file_path = format!("{cache_dir_path}/config.json");
+
+    // for task_init, remove _task_### suffix
+    let re = Regex::new(r"_task_\d+").unwrap();
+    config_cache_file_path = re.replace(&config_cache_file_path, "").to_string();
+
+    log(&format!("Looking for config at: {}", &config_cache_file_path));
 
     let file_path = Path::new(&config_cache_file_path);
 
@@ -401,3 +410,10 @@ fn get_auto_update_data_from_json(json: &Value) -> Option<AutoUpdate> {
         version: stage1_version,
     })
 }
+
+/*
+fn print_home() {
+    let home_var = env::var("HOME").unwrap_or("${HOME}".to_string());
+    log(&format!("HOME = {}", &home_var));
+}
+*/

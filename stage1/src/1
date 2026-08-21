@@ -15,7 +15,6 @@ pub mod dispatch;
 pub mod edf;
 pub mod jobenv;
 pub mod log;
-pub mod podman;
 pub mod slurmstepd;
 pub mod srun;
 
@@ -27,14 +26,11 @@ use crate::log::log;
 use crate::config::load_config;
 use crate::dispatch::dispatch_execution;
 use crate::jobenv::load_jobenv;
-use crate::podman::podman_get_pid_from_file;
 
-pub(crate) const NAME: &str = "cosmodrome";
 pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub(crate) const COMMAND_NAME: &str = "stage1";
 pub(crate) const CACHE_PATH: &str = "${HOME}/.local/share/cosmodrome/cache";
 pub(crate) const LOCAL2REMOTE_VARNAME: &str = "SLURM_STAGE0_LOCAL2REMOTE_DATA";
-pub(crate) const SLURM_BATCH_SCRIPT: u32 = 0xfffffffb;
 
 #[derive(Parser, Clone, Debug)]
 #[command(about = "\n
