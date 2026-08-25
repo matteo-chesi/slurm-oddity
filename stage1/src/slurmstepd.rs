@@ -3,7 +3,21 @@ use std::env::{VarError, remove_var, var};
 use nix::unistd::{getegid, geteuid};
 use users::{get_current_uid, get_current_gid};
 
-use crate::{NAME, SLURM_BATCH_SCRIPT, log::log, Job, Run, State, podman_get_pid_from_file, remote_load_edf};
+use crate::{NAME,
+    SLURM_BATCH_SCRIPT,
+    log::log,
+    Job,
+    Run,
+    State,
+    modify_edf_for_sbatch,
+    podman_get_pid_from_file,
+    remote_load_edf,
+    render_user_job_config,
+    send_output,
+    setup_folders,
+    sync_podman_pull,
+    sync_podman_start,
+};
 
 pub(crate) fn slurmstepd_init_post_opt(state: &mut State) {
     remote_load_edf(state);
@@ -16,11 +30,24 @@ pub(crate) fn slurmstepd_task_init(state: &mut State) {
     remote_load_edf(state);
     let _ = job_get_info(state);
     let _ = run_get_info(state);
+    match render_user_job_config(state) {
+        Ok(_) => {},
+        Err(_) => return,
+    };
+    let _ = setup_folders(state);
+    let _ = modify_edf_for_sbatch(state);
     log(&format!("CONFIG:\n{:#?}", state.config));
     log(&format!("RUN_INFO:\n{:#?}", state.run));
     log(&format!("JOB_INFO:\n{:#?}", state.job));
+    log(&format!("JOB_ARG:\n{:#?}", state.job_arg));
     log(&format!("JOB_ENV:\n{:#?}", state.job_env));
     log(&format!("EDF_INFO:\n{:#?}", state.edf));
+    log("YUPPIE!");
+    let _ = sync_podman_pull(state);
+    log("YEAH!!");
+    let _ = sync_podman_start(state);
+    log("STAKAZZO");
+    send_output(state);
 }
 
 pub(crate) fn remote_unset_env_vars(state: &mut State) -> Result<(), Box<dyn Error>> {

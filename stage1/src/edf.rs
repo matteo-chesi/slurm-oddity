@@ -1,8 +1,9 @@
 use std::env::var;
+use std::error::Error;
 use std::fs::File;
 use std::io::Write;
-use raster::{EDF, render};
-use crate::{LOCAL2REMOTE_VARNAME, State, log::log, get_cache_dir_path};
+use raster::{EDF, render, mount::SarusMount};
+use crate::{SLURM_BATCH_SCRIPT, LOCAL2REMOTE_VARNAME, State, log::log, get_cache_dir_path};
 
 pub(crate) fn local_load_edf(state: &mut State) {
     let edf_name = match &state.args.payload {
@@ -151,3 +152,55 @@ fn cache2edf() -> Result<EDF, String> {
     Ok(edf)
 }
 */
+
+pub(crate) fn modify_edf_for_sbatch(
+    state: &mut State,
+) -> Result<(), Box<dyn Error>> {
+    let job = match &state.job {
+        Some(j) => j,
+        None => {
+            let msg = "Error: cannot find job data at this stage";
+            log(msg);
+            return Ok(());
+        }
+    };
+
+    let stepid = job.stepid;
+    if stepid == SLURM_BATCH_SCRIPT {
+        let mut edf = match state.edf.clone() {
+            Some(e) => e,
+            None => {
+                return Ok(());
+            }
+        };
+
+        let argv = &state.job_arg;
+
+        let sbatch_script = match argv.get(0) {
+            Some(s) => s,
+            None => {
+                let msg = "Error: cannot read job argv[0]";
+                log(msg);
+                return Ok(());
+            }
+        };
+
+        let flags = String::from("bind,ro,nosuid,nodev,private");
+        let mount_string = format!("{}:{}:{}", &sbatch_script, &sbatch_script, &flags);
+
+        let sm = match SarusMount::try_new(mount_string, &None) {
+            Ok(ok) => ok,
+            Err(_) => {
+                let msg = "Error: cannot create sbatch script mount defintion";
+                log(msg);
+                return Ok(());
+            }
+        };
+
+        log(&format!("NEW MOUNT: {}", sbatch_script));
+        edf.mounts.append(&mut vec![sm]);
+
+        state.edf = Some(edf);
+    }    
+    Ok(())
+}

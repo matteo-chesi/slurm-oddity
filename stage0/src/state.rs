@@ -25,6 +25,7 @@ pub(crate) struct Stage0State {
     pub(crate) gid: Option<u32>,
     pub(crate) jobid: Option<String>,
     pub(crate) caller_id: Option<String>,
+    pub(crate) job_arg: Vec<String>,
     pub(crate) job_env: HashMap<String, String>,
 }
 
@@ -40,8 +41,25 @@ impl Default for Stage0State {
             gid: None,
             jobid: None,
             caller_id: None,
+            job_arg: vec![],
             job_env: HashMap::from([]),
         }
+    }
+}
+
+pub(crate) fn get_local_task_id(state: &Stage0State) -> u32 {
+    match state.job_env.get("SLURM_LOCALID") {
+        None => {
+            return u32::MAX
+        },
+        Some(id) => match id.parse::<u32>() {
+            Ok(num) => {
+                return num;
+            },
+            Err(_) => {
+                return u32::MAX;
+            },
+        },
     }
 }
 
@@ -264,19 +282,42 @@ pub(crate) fn remote_load_state(
 
     // Translate job env
     remote_log(plugin, spank, &format!("STIKKAZZI"));
+    let vc = get_job_arg(spank);
+    plugin.state.job_arg = vc.clone();
     let hm = get_job_env(spank);
     plugin.state.job_env = hm.clone();
     
     // Write input.json
+    jobarg2cache(plugin, spank); 
     jobenv2cache(plugin, spank); 
     remote_log(plugin, spank, &format!("AMMAZZI"));
     
+    let mut i = 0;
+    for a in vc.clone() {
+        remote_log(plugin, spank, &format!("JOBARG MEMBER: {i} = {a}"));
+        i = i + 1;
+    }
     
     for (k,v) in hm.clone() {
-        remote_log(plugin, spank, &format!("JOBENV VARIABLE: {k} = {v}",));
+        remote_log(plugin, spank, &format!("JOBENV VARIABLE: {k} = {v}"));
     }
 
     Ok(())
+}
+
+pub(crate) fn get_job_arg(spank: &mut SpankHandle) -> Vec<String> {
+    let vec = match spank.job_argv() {
+        Ok(v) => v,
+        Err(_) => [].to_vec(),
+    };
+
+    let mut vc: Vec<String> = vec![];
+    for v in vec.into_iter() {
+        let value = v.to_string();
+        vc.push(value);
+    }
+
+    return vc;
 }
 
 pub(crate) fn get_job_env(spank: &mut SpankHandle) -> HashMap<String,String> {
@@ -386,4 +427,34 @@ pub(crate) fn jobenv2cache(plugin: &mut SpankStage0, spank: &mut SpankHandle) {
     let _ = file.flush();
     let _ = file.sync_all();
     remote_log(plugin, spank, &format!("BIGAZZI"));
+}
+
+pub(crate) fn jobarg2cache(plugin: &mut SpankStage0, _spank: &mut SpankHandle) {
+
+    let cache_dir_path = get_cache_dir_path(plugin);
+    let _ = create_dir_path(plugin, Path::new(&cache_dir_path));
+    let cache_file_path = format!("{cache_dir_path}/jobarg.json");
+
+    let content = match serde_json::to_string(&plugin.state.job_arg) {
+        Ok(s) => s,
+        Err(_) => {
+            panic!("Cannot serialize jobarg to json");
+        }
+    };
+
+    let mut file = match File::create(&cache_file_path) {
+        Ok(f) => f,
+        Err(_) => {
+            panic!("Cannot open {cache_file_path}");
+        }
+    };
+
+    let _ = match file.write_all(content.as_bytes()) {
+        Ok(f) => f,
+        Err(_) => {
+            panic!("Cannot write to {cache_file_path}");
+        }
+    };
+    let _ = file.flush();
+    let _ = file.sync_all();
 }

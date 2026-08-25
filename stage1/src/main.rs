@@ -2,6 +2,9 @@ use std::collections::HashMap;
 use std::env;
 use std::error::Error;
 use std::fs::create_dir_all;
+use std::fs::Permissions;
+use std::io::{self, Write};
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::Command;
 use nix::libc::{gid_t, uid_t};
@@ -13,21 +16,25 @@ pub mod autoupdate;
 pub mod config;
 pub mod dispatch;
 pub mod edf;
+pub mod jobarg;
 pub mod jobenv;
 pub mod log;
 pub mod podman;
 pub mod slurmstepd;
 pub mod srun;
+pub mod sync;
 
 use raster::{Config, EDF};
 
 use crate::autoupdate::{AutoUpdate, auto_update, get_requested_exe_path};
-use crate::edf::{local_load_edf, remote_load_edf};
+use crate::edf::{local_load_edf, modify_edf_for_sbatch, remote_load_edf};
 use crate::log::log;
-use crate::config::load_config;
+use crate::config::{load_config, render_user_job_config, setup_imagestore};
 use crate::dispatch::dispatch_execution;
+use crate::jobarg::load_jobarg;
 use crate::jobenv::load_jobenv;
-use crate::podman::podman_get_pid_from_file;
+use crate::podman::{PODMAN_PIDFILE_NAME, podman_get_pid_from_file, podman_pull, podman_start};
+use crate::sync::{sync_podman_pull,sync_podman_start};
 
 pub(crate) const NAME: &str = "cosmodrome";
 pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -36,7 +43,7 @@ pub(crate) const CACHE_PATH: &str = "${HOME}/.local/share/cosmodrome/cache";
 pub(crate) const LOCAL2REMOTE_VARNAME: &str = "SLURM_STAGE0_LOCAL2REMOTE_DATA";
 pub(crate) const SLURM_BATCH_SCRIPT: u32 = 0xfffffffb;
 
-#[derive(Parser, Clone, Debug)]
+#[derive(Serialize, Parser, Clone, Debug)]
 #[command(about = "\n
 Cosmodrome project stage1
 The command should be called by slurm spank plugin stage0
@@ -53,14 +60,14 @@ struct Args {
     payload: Option<String>,
 }
 
-#[derive(Clone, Copy, ValueEnum, Debug, PartialEq)]
+#[derive(Serialize, Clone, Copy, ValueEnum, Debug, PartialEq)]
 enum Context {
     Local,
     Allocator,
     Remote,
 }
 
-#[derive(Clone, Copy, ValueEnum, Debug, PartialEq)]
+#[derive(Serialize, Clone, Copy, ValueEnum, Debug, PartialEq)]
 #[value(rename_all = "snake_case")]
 enum Function {
     Init,
@@ -72,7 +79,7 @@ enum Function {
     Exit,
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Debug)]
 struct State {
     exe_user: String,
     exe_path: String,
@@ -80,6 +87,7 @@ struct State {
     args: Args,
     config: Config,
     job_env: HashMap<String, String>,
+    job_arg: Vec<String>,
     edf: Option<EDF>,
     job: Option<Job>,
     run: Option<Run>,
@@ -154,6 +162,7 @@ pub(crate) fn load_state(args: &Args) -> State {
         exe_args: exe_args,
         args: state_args,
         job_env: load_jobenv(),
+        job_arg: load_jobarg(),
         config: load_config(),
         edf: None,
         job: None,
@@ -193,7 +202,7 @@ pub(crate) fn expand_vars_string(s: String) -> Result<String, Box<dyn Error>> {
     };
 }
 
-pub(crate) fn create_dir_path(dir_path: &Path) -> Result<(), Box<dyn Error>> {
+pub(crate) fn create_dir_path(dir_path: &Path, mode: u32) -> Result<(), Box<dyn Error>> {
     let path = dir_path;
 
     if ! path.exists() {
@@ -201,12 +210,14 @@ pub(crate) fn create_dir_path(dir_path: &Path) -> Result<(), Box<dyn Error>> {
         match path.parent() {
             Some(pp) => {
                 if ! pp.exists() {
-                    create_dir_path(pp)?;
+                    create_dir_path(pp, 0o700)?;
                 }
             },
             None => {},
         };
         create_dir_all(path)?;
+        let perms = Permissions::from_mode(mode);
+        std::fs::set_permissions(&path, perms)?;
     }
     Ok(())
 }
@@ -226,4 +237,46 @@ pub(crate) fn get_cache_dir_path() -> String {
     let cache_dirname = caller_id;
     let cache_dir_path = format!("{cache_path}/{cache_dirname}");
     return cache_dir_path;
+}
+
+pub(crate) fn setup_folders(
+    state: &mut State,
+) -> Result<(), Box<dyn Error>> {
+    let base_path = match state.run.clone() {
+        Some(r) => r.podman_tmp_path,
+        None => {
+            let msg = "Error: couldn't find podman_tmp_path";
+            log(msg);
+            return Err(msg.into());
+        }
+    };
+
+    let dir_mode = 0o700;
+    let mut dir_path;
+
+    dir_path = format!("{}", base_path);
+    create_dir_path(Path::new(&dir_path), dir_mode)?;
+
+    dir_path = format!("{}/graphroot", base_path);
+    create_dir_path(Path::new(&dir_path), dir_mode)?;
+
+    dir_path = format!("{}/runroot", base_path);
+    create_dir_path(Path::new(&dir_path), dir_mode)?;
+
+    Ok(())
+}
+
+pub(crate) fn get_local_task_id(state: &State) -> u32 {
+    return state.job.clone().unwrap().local_task_id;
+}
+
+pub(crate) fn send_output(state: &State) {
+    let json_string = match serde_json::to_string_pretty(state) {
+        Ok(s) => s,
+        Err(_) => {
+            panic!("Cannot serialize State to json");
+        }
+    };
+    println!("{json_string}");
+    let _ = io::stdout().flush();
 }

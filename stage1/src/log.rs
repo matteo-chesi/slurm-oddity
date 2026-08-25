@@ -60,7 +60,7 @@ pub(crate) fn log(arg: &str) {
     let _ = writeln!(file, "{}", time_msg);
     let _ = file.flush();
     let _ = file.sync_all();
-    println!("{msg}");
+    eprintln!("{msg}");
 }
 
 pub(crate) fn get_log_dirpath() -> String {

@@ -16,6 +16,7 @@ pub(crate) use crate::state::set_local2remote_env_var;
 
 pub mod args;
 pub mod config;
+pub mod containers;
 pub mod dispatch;
 pub mod log;
 pub mod stage1;

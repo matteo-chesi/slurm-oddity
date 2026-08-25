@@ -1,4 +1,5 @@
 use std::env;
+use std::error::Error;
 use std::collections::HashMap;
 use std::ffi::{OsString};
 use std::fs::File;
@@ -11,8 +12,14 @@ use url::Url;
 use users::{get_current_groupname};
 use regex::Regex;
 
-use raster::{Config, config::ConfigHooks as ConfigHooks, load_config as raster_load_config};
-use crate::{AutoUpdate, auto_update, create_dir_path, get_cache_dir_path, log};
+use raster::{Config,
+    config::ConfigHooks as ConfigHooks,
+    config::remove_sarus_annotations,
+    ExecutedCommand,
+    hook_run,
+    update_config_by_user,
+    load_config as raster_load_config};
+use crate::{AutoUpdate, State, auto_update, create_dir_path, get_cache_dir_path, log};
 
 pub(crate) fn load_config() -> Config {
     //print_home();
@@ -38,7 +45,7 @@ pub(crate) fn load_config() -> Config {
 fn config2cache(config: &Config) {
 
     let cache_dir_path = get_cache_dir_path();
-    let _ = create_dir_path(Path::new(&cache_dir_path));
+    let _ = create_dir_path(Path::new(&cache_dir_path), 0o700);
 
     let config_cache_file_path = format!("{cache_dir_path}/config.json");
 
@@ -417,3 +424,148 @@ fn print_home() {
     log(&format!("HOME = {}", &home_var));
 }
 */
+
+pub(crate) fn render_user_job_config(
+    state: &mut State,
+) -> Result<(), Box<dyn Error>> {
+    let mut job_config = state.config.clone();
+
+    let edf = match &state.edf {
+        Some(f) => f,
+        None => {
+            log(&format!("Error: EDF shouldn't be None, here"));
+            return Err("Error: EDF shouldn't be None, here".into());
+        },
+    };
+
+    update_config_by_user(&mut job_config, edf.clone())?;
+    remove_sarus_annotations(&mut edf.clone())?;
+    state.edf = Some(edf.clone());
+
+    match setup_config(&job_config, state) {
+        Ok(_) => {}
+        Err(_) => {
+            log(&format!("Error: cannot render user job configuration"));
+            return Err("Error: cannot render user job configuration".into());
+        }
+    }
+
+    Ok(())
+}
+
+pub(crate) fn setup_config(
+    config: &Config,
+    state: &mut State,
+) -> Result<(), Box<dyn Error>> {
+    state.config = config.clone();
+
+    if config.parallax_imagestore == "" {
+        let msg = "cannot find parallax_imagestore" ;
+        log(msg);
+        return Err(msg.into());
+    }
+
+    if config.parallax_mount_program == "" {
+        let msg = "cannot find parallax_mount_program";
+        log(msg);
+        return Err(msg.into());
+    }
+
+    if config.parallax_path == "" {
+        let msg = "cannot find parallax_path";
+        log(msg);
+        return Err(msg.into());
+    }
+
+    if config.podman_module == "" {
+        let msg = "cannot find podman_module";
+        log(msg);
+        return Err(msg.into());
+    }
+
+    if config.podman_path == "" {
+        let msg = "cannot find podman_path";
+        log(msg);
+        return Err(msg.into());
+    }
+
+    if config.podman_tmp_path == "" {
+        let msg = "cannot find podman_tmp_path";
+        log(msg);
+        return Err(msg.into());
+    }
+
+    if config.tracking_enabled && config.tracking_tool == "" {
+        let msg = "cannot find tracking_tool";
+        log(msg);
+        return Err(msg.into());
+    }
+
+    Ok(())
+}
+
+pub(crate) fn setup_imagestore(config: &Config) -> Result<(), Box<dyn Error>> {
+    let imagestore = &config.parallax_imagestore;
+
+    match hook_run(config, "parallax_imagestore_create", vec![imagestore])? {
+        Some(ec) => log_hook_ec(ec, "parallax_imagestore_create hook"),
+        None => {},
+    }
+
+    if !Path::new(imagestore).exists() {
+        // If imagestore does not exist, it tries to create it
+        if let Err(e) = std::fs::create_dir_all(imagestore) {
+            let msg = format!("cannot create parallax_imagestore: {e}");
+            log(&msg);
+            return Err(msg.into());
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn log_hook_ec(ec: ExecutedCommand, prefix: &str) {
+
+    let rc = match ec.output.status.code() {
+        Some(ok) => format!("{ok}"),
+        None => {
+            log("{prefix} exited by signal");
+            String::from("UNKNOWN")
+        }
+    };
+
+    let mut stdout = match String::from_utf8(ec.output.stdout) {
+        Ok(ok) => ok,
+        Err(_) => String::from(""),
+    };
+    if stdout.ends_with("\n") {
+        stdout.pop();
+    };
+
+    let mut stderr = match String::from_utf8(ec.output.stderr) {
+        Ok(ok) => ok,
+        Err(_) => String::from(""),
+    };
+    if stderr.ends_with("\n") {
+        stderr.pop();
+    };
+
+    log(&format!("CMD: {}", ec.command));
+    log(&format!("{prefix} exit code: {}", rc));
+
+    if stdout != "" {
+        let lines = stdout.split("\n");
+        for line in lines {
+            log(&format!("{prefix} stdout: {}", line));
+            log(&format!("{}", line));
+        }
+    }
+
+    if stderr != "" {
+        let lines = stderr.split("\n");
+        for line in lines {
+            log(&format!("{prefix} stderr: {}", line));
+            log(&format!("{}", line));
+        }
+    }
+}
+

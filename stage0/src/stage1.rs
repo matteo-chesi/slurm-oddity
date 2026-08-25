@@ -1,30 +1,45 @@
 use std::env::{current_dir, set_current_dir, set_var};
+use std::error::Error;
 use std::ffi::OsStr;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Output};
 use users::get_current_uid;
 
 use slurm_spank::{Context, SpankHandle};
 
 use crate::{SpankStage0, log, remote_log, set_local2remote_env_var, spank_getenv};
 
-pub(crate) fn run_stage1(stage0: &mut SpankStage0, spank: &mut SpankHandle, context: String, function: String, payload: Option<String>) {
+pub(crate) fn run_stage1(
+    stage0: &mut SpankStage0,
+    spank: &mut SpankHandle,
+    context: String,
+    function: String,
+    payload: Option<String>)
+-> Result<Output, Box<dyn Error>> {
 
-    let _ = match spank.context() {
+    let result = match spank.context() {
         Ok(Context::Local) | Ok(Context::Allocator) | Ok(Context::Slurmd) => {
-            local_run_stage1(stage0, spank, context, function, payload);
+            local_run_stage1(stage0, spank, context, function, payload)
         },
         Ok(Context::Remote) => {
-            remote_run_stage1(stage0, spank, context, function, payload);
+            remote_run_stage1(stage0, spank, context, function, payload)
         }
         _ => {
-                return ();
+            Err("Nothing to run".into())
         },
     };
+
+    return result;
 }
 
-fn local_run_stage1(stage0: &mut SpankStage0, _spank: &mut SpankHandle, context: String, function: String, payload: Option<String>) {
+fn local_run_stage1(
+    stage0: &mut SpankStage0,
+    _spank: &mut SpankHandle,
+    context: String,
+    function: String,
+    payload: Option<String>)
+-> Result<Output, Box<dyn Error>> {
 
     let mut fstr = format!("{}({},{},{})", "run_stage1", context, function, "None");
     let mut pl;
@@ -37,12 +52,13 @@ fn local_run_stage1(stage0: &mut SpankStage0, _spank: &mut SpankHandle, context:
 
     let cmdname;
     if cur_uid == 0 {
-        return;
+        return Err("Cannot run stage1 as root".into());
     } else {
         if ! Path::new(&stage0.config.stage1_user_path).exists() {
             if ! Path::new(&stage0.config.stage1_system_path).exists() {
-                log(format!("ERROR: cannot find stage1 executable at \"{}\"", &stage0.config.stage1_system_path).as_str());
-                return;
+                let msg = format!("ERROR: cannot find stage1 executable at \"{}\"", &stage0.config.stage1_system_path);
+                log(&msg);
+                return Err(msg.into());
             } else {
                 cmdname = &stage0.config.stage1_system_path;
             }
@@ -63,11 +79,15 @@ fn local_run_stage1(stage0: &mut SpankStage0, _spank: &mut SpankHandle, context:
 
     log(&format!("Executing: {}", &cmdstr));
 
-    let output = Command::new(cmdname)
-        .args(cmdargs)
-        .output()
-        .expect("failed to execute process");
+    let result = Command::new(cmdname)
+        .args(cmdargs.clone())
+        .output();
 
+    if result.is_err() {
+        return Err(format!("ERROR: Failed to spawn command: {} {:#?}", cmdname, cmdargs).into());
+    };
+
+    let output = result.unwrap();
     log(&format!("Executed : {}", &cmdstr));
 
     let exit_code = match output.status.code() {
@@ -76,7 +96,7 @@ fn local_run_stage1(stage0: &mut SpankStage0, _spank: &mut SpankHandle, context:
     };
     log(&format!("RC: {}", exit_code));
 
-    let mut stdout = String::from_utf8(output.stdout).unwrap_or(String::from(""));
+    let mut stdout = String::from_utf8(output.stdout.clone()).unwrap_or(String::from(""));
     if ! stdout.is_empty() {
         stdout.pop();
         let lines = stdout.split('\n');
@@ -84,7 +104,7 @@ fn local_run_stage1(stage0: &mut SpankStage0, _spank: &mut SpankHandle, context:
             log(&format!("stdout: {}", line));
         }
     };
-    let mut stderr = String::from_utf8(output.stderr).unwrap_or(String::from(""));
+    let mut stderr = String::from_utf8(output.stderr.clone()).unwrap_or(String::from(""));
     if ! stderr.is_empty() {
         stderr.pop();
         let lines = stderr.split('\n');
@@ -97,9 +117,16 @@ fn local_run_stage1(stage0: &mut SpankStage0, _spank: &mut SpankHandle, context:
         set_local2remote_env_var(stage0);
     }
 
+    return Ok(output);
 }
 
-fn remote_run_stage1(stage0: &mut SpankStage0, spank: &mut SpankHandle, context: String, function: String, payload: Option<String>) {
+fn remote_run_stage1(
+    stage0: &mut SpankStage0,
+    spank: &mut SpankHandle,
+    context: String,
+    function: String,
+    payload: Option<String>) 
+-> Result<Output, Box<dyn Error>> {
 
     let mut fstr = format!("{}({},{},{})", "run_stage1", context, function, "None");
     let mut pl;
@@ -129,13 +156,14 @@ fn remote_run_stage1(stage0: &mut SpankStage0, spank: &mut SpankHandle, context:
     let innercmd;
     if cur_uid == 0 {
         if stage0.state.username.is_none() {
-            return;
+            return Err("Unknown username".into());
         }
         
         if ! Path::new(&stage0.config.stage1_user_path).exists() {
             if ! Path::new(&stage0.config.stage1_system_path).exists() {
-                remote_log(stage0, spank, format!("ERROR: cannot find stage1 executable at \"{}\"", &stage0.config.stage1_system_path).as_str());
-                return;
+                let msg = format!("ERROR: cannot find stage1 executable at \"{}\"", &stage0.config.stage1_system_path);
+                remote_log(stage0, spank, &msg);
+                return Err(msg.into());
             } else {
                 cmd2run = stage0.config.stage1_system_path.clone();
             }
@@ -164,8 +192,9 @@ fn remote_run_stage1(stage0: &mut SpankStage0, spank: &mut SpankHandle, context:
     } else {
         if ! Path::new(&stage0.config.stage1_user_path).exists() {
             if ! Path::new(&stage0.config.stage1_system_path).exists() {
-                remote_log(stage0, spank, format!("ERROR: cannot find stage1 executable at \"{}\"", &stage0.config.stage1_system_path).as_str());
-                return;
+                let msg = format!("ERROR: cannot find stage1 executable at \"{}\"", &stage0.config.stage1_system_path);
+                remote_log(stage0, spank, &msg);
+                return Err(msg.into());
             } else {
                 cmdname = stage0.config.stage1_system_path.clone();
             }
@@ -184,11 +213,15 @@ fn remote_run_stage1(stage0: &mut SpankStage0, spank: &mut SpankHandle, context:
 
     remote_log(stage0, spank, &format!("Executing: {}", &cmdstr));
 
-    let output = Command::new(cmdname)
+    let result = Command::new(cmdname)
         .args(cmdargs)
-        .output()
-        .expect("failed to execute process");
+        .output();
 
+    if result.is_err() {
+        return Err("failed to execute process".into());
+    }
+    
+    let output = result.unwrap();
     remote_log(stage0, spank, &format!("Executed : {}", &cmdstr));
 
     let exit_code = match output.status.code() {
@@ -197,7 +230,7 @@ fn remote_run_stage1(stage0: &mut SpankStage0, spank: &mut SpankHandle, context:
     };
     remote_log(stage0, spank, &format!("RC: {}", exit_code));
 
-    let mut stdout = String::from_utf8(output.stdout).unwrap_or(String::from(""));
+    let mut stdout = String::from_utf8(output.stdout.clone()).unwrap_or(String::from(""));
     if ! stdout.is_empty() {
         stdout.pop();
         let lines = stdout.split('\n');
@@ -205,7 +238,7 @@ fn remote_run_stage1(stage0: &mut SpankStage0, spank: &mut SpankHandle, context:
             remote_log(stage0, spank, &format!("stdout: {}", line));
         }
     };
-    let mut stderr = String::from_utf8(output.stderr).unwrap_or(String::from(""));
+    let mut stderr = String::from_utf8(output.stderr.clone()).unwrap_or(String::from(""));
     if ! stderr.is_empty() {
         stderr.pop();
         let lines = stderr.split('\n');
@@ -215,6 +248,8 @@ fn remote_run_stage1(stage0: &mut SpankStage0, spank: &mut SpankHandle, context:
     };
     
     let _ = set_current_dir(prev_dir);
+
+    return Ok(output);
 }
 
 fn set_job_home_env_var(spank: &mut SpankHandle) {

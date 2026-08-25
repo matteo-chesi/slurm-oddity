@@ -74,7 +74,7 @@ fn get_new_version(au: &AutoUpdate) -> Result<(),()> {
     let target_file_path = Path::new(&target_file_string);
 
     let dir_path = target_file_path.parent().unwrap();
-    let _ = create_dir_path(&dir_path);
+    let _ = create_dir_path(&dir_path, 0o700);
 
     let file_path = get_source_file_path(au);
     log(&format!("Requested file_path = {}", &file_path));
@@ -137,7 +137,7 @@ fn download_new_version(source: &Url, target: &Path) -> Result<(),()> {
 fn au2cache(au: &AutoUpdate) {
 
     let cache_dir_path = get_cache_dir_path();
-    let _ = create_dir_path(Path::new(&cache_dir_path));
+    let _ = create_dir_path(Path::new(&cache_dir_path), 0o700);
     let au_cache_file_path = format!("{cache_dir_path}/auto_update.json");
 
     let au_content = match serde_json::to_string(&au) {
