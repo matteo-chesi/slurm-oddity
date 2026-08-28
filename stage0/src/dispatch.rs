@@ -2,7 +2,7 @@ use std::error::Error;
 
 use slurm_spank::{Context, Plugin, SpankHandle};
 
-use crate::{SpankStage0, run_stage1};
+use crate::{SpankStage0, run_stage1, remote_run_stage1_new};
 use crate::args::*;
 use crate::config::{dispatch_load_config};
 use crate::state::{dispatch_load_state};
@@ -113,12 +113,7 @@ unsafe impl Plugin for SpankStage0 {
         
         dispatch_load_state(self, spank)?;
 
-        let result = run_stage1(self, spank, context, function, payload);
-        if result.is_err() {
-            return Err("stage1 failed.".into());
-        };
-
-        let output = result.unwrap();
+        let output = remote_run_stage1_new(self, spank, context, function, payload)?;
         container_join_from_stage1_output(self, spank, output)?;
 
         Ok(())

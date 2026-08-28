@@ -3,7 +3,7 @@ use std::fs::create_dir_all;
 use std::os::unix::fs::chown;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
 use slurm_spank::{Plugin, SLURM_VERSION_NUMBER, SPANK_PLUGIN, SpankHandle};
 use crate::args::Stage0Args;
@@ -11,7 +11,7 @@ use crate::config::Stage0Config;
 use crate::state::Stage0State;
 
 pub(crate) use crate::log::{log, remote_log, get_log_dirpath};
-pub(crate) use crate::stage1::run_stage1;
+pub(crate) use crate::stage1::{run_stage1, remote_run_stage1_new};
 pub(crate) use crate::state::set_local2remote_env_var;
 
 pub mod args;
@@ -36,6 +36,11 @@ struct SpankStage0 {
     args: Stage0Args,
     config: Stage0Config,
     state: Stage0State,
+}
+
+#[derive(Deserialize, Serialize, Default)]
+struct ConsoleOutput {
+    console_out: String,
 }
 
 #[macro_export]

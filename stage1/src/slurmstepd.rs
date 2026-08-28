@@ -2,6 +2,7 @@ use std::error::Error;
 use std::env::{VarError, remove_var, var};
 use nix::unistd::{getegid, geteuid};
 use users::{get_current_uid, get_current_gid};
+use std::{thread, time::Duration};
 
 use crate::{NAME,
     SLURM_BATCH_SCRIPT,
@@ -9,6 +10,7 @@ use crate::{NAME,
     Job,
     Run,
     State,
+    console_output,
     modify_edf_for_sbatch,
     podman_get_pid_from_file,
     remote_load_edf,
@@ -43,6 +45,9 @@ pub(crate) fn slurmstepd_task_init(state: &mut State) {
     log(&format!("JOB_ENV:\n{:#?}", state.job_env));
     log(&format!("EDF_INFO:\n{:#?}", state.edf));
     log("YUPPIE!");
+    console_output("YUPPIE!");
+    thread::sleep(Duration::from_millis(5000));
+    console_output("YEAH!!!");
     let _ = sync_podman_pull(state);
     log("YEAH!!");
     let _ = sync_podman_start(state);

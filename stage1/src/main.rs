@@ -9,7 +9,7 @@ use std::path::Path;
 use std::process::Command;
 use nix::libc::{gid_t, uid_t};
 use clap::{Parser, ValueEnum};
-use serde::Serialize;
+use serde::{Serialize};
 use whoami::username;
 
 pub mod autoupdate;
@@ -115,6 +115,11 @@ pub(crate) struct Run {
     pid: usize,
     podman_tmp_path: String,
     syncfile_path: String,
+}
+
+#[derive(Clone, Serialize, Default, Debug)]
+pub(crate) struct ConsoleOutput {
+    console_out: String,
 }
 
 pub(crate) fn get_versioned_command_name() -> String {
@@ -271,7 +276,7 @@ pub(crate) fn get_local_task_id(state: &State) -> u32 {
 }
 
 pub(crate) fn send_output(state: &State) {
-    let json_string = match serde_json::to_string_pretty(state) {
+    let json_string = match serde_json::to_string(state) {
         Ok(s) => s,
         Err(_) => {
             panic!("Cannot serialize State to json");
@@ -280,3 +285,19 @@ pub(crate) fn send_output(state: &State) {
     println!("{json_string}");
     let _ = io::stdout().flush();
 }
+
+pub(crate) fn console_output(msg: &str) {
+    let console_out = ConsoleOutput {
+        console_out: msg.to_string(),
+    };
+
+    let console_out_json = match serde_json::to_string(&console_out) {
+        Ok(s) => s,
+        Err(_) => {
+            panic!("Cannot serialize console out message to json string");
+        }
+    };
+
+    println!("{console_out_json}");
+}
+
