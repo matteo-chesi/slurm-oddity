@@ -8,11 +8,12 @@ use std::io::Write;
 use std::path::Path;
 use gethostname::gethostname;
 use serde::{Deserialize, Serialize};
+use tracing::{info};
 
 use slurm_spank::{Context, SpankHandle};
 use raster::{expand_vars_string};
 
-use crate::{CACHE_PATH, LOCAL2REMOTE_VARNAME, LOCAL2REMOTE_FILENAME, create_dir_path, SpankStage0, get_log_dirpath, log, remote_log, spank_getenv};
+use crate::{CACHE_PATH, LOCAL2REMOTE_VARNAME, LOCAL2REMOTE_FILENAME, create_dir_path, SpankStage0, get_log_dirpath, remote_log, spank_getenv};
 
 #[derive(Serialize, Deserialize)]
 pub(crate) struct Stage0State {
@@ -109,7 +110,7 @@ pub(crate) fn local_load_state(
         Some(l) => l,
         None => &String::from("None"),
     };
-    log(&format!("STAGE0_LOGDIR: {}", logdir));
+    info!("STAGE0_LOGDIR: {}", logdir);
 
     key = "SLURM_STAGE0_USERNAME";
     value = whoami::username().unwrap();
@@ -122,7 +123,7 @@ pub(crate) fn local_load_state(
         Some(u) => u,
         None => &String::from("None"),
     };
-    log(&format!("STAGE0_USERNAME: {}", username));
+    info!("STAGE0_USERNAME: {}", username);
 
     key = "SLURM_STAGE0_CALLER_ID";
     let pid = std::process::id();
@@ -140,7 +141,7 @@ pub(crate) fn local_load_state(
         Some(u) => u,
         None => &String::from("None"),
     };
-    log(&format!("STAGE0_CALLER_ID: {}", caller_id));
+    info!("STAGE0_CALLER_ID: {}", caller_id);
 
     Ok(())
 }
@@ -375,12 +376,12 @@ pub(crate) fn set_local2remote_env_var(plugin: &mut SpankStage0) {
     let cache_dir_path = get_cache_dir_path(plugin);
     let file_path_str = format!("{cache_dir_path}/{LOCAL2REMOTE_FILENAME}");
     let file_path = Path::new(&file_path_str);
-    log(&format!("HERE: {}", file_path_str));
+    info!("HERE: {}", file_path_str);
 
     if ! file_path.exists() {
         return;
     };
-    log(&format!("THERE"));
+    info!("THERE");
 
     let content = match read_to_string(file_path) {
         Ok(c) => c,
@@ -388,12 +389,12 @@ pub(crate) fn set_local2remote_env_var(plugin: &mut SpankStage0) {
             return;
         },
     };
-    log(&format!("MORE:\n{}", content));
+    info!("MORE:\n{}", content);
 
     unsafe {
         set_var(LOCAL2REMOTE_VARNAME, OsStr::new(&content));
     }
-    log(&format!("MORE THAN EVER"));
+    info!("MORE THAN EVER");
 }
 
 pub(crate) fn jobenv2cache(plugin: &mut SpankStage0, spank: &mut SpankHandle) {

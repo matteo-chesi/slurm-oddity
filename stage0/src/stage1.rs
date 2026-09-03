@@ -10,10 +10,11 @@ use std::io::{BufRead, BufReader, Read};
 //use tokio::process::{Command as TokioCommand};
 //use tokio::io::{AsyncBufReadExt, BufReader};
 use users::get_current_uid;
+use tracing::{info};
 
 use slurm_spank::{Context, SpankHandle, spank_log_user};
 
-use crate::{ConsoleOutput, SpankStage0, log, remote_log, set_local2remote_env_var, spank_getenv};
+use crate::{ConsoleOutput, SpankStage0, remote_log, set_local2remote_env_var, spank_getenv};
 
 pub(crate) fn run_stage1(
     stage0: &mut SpankStage0,
@@ -53,7 +54,7 @@ fn local_run_stage1(
         pl = payload.clone().unwrap();
         fstr = format!("{}({},{},{})", "run_stage1", context, function, pl.as_str())
     }
-    log(&format!("[UID: {}] Calling: {}", &cur_uid, &fstr));
+    info!("[UID: {}] Calling: {}", &cur_uid, &fstr);
 
     let cmdname;
     if cur_uid == 0 {
@@ -62,7 +63,7 @@ fn local_run_stage1(
         if ! Path::new(&stage0.config.stage1_user_path).exists() {
             if ! Path::new(&stage0.config.stage1_system_path).exists() {
                 let msg = format!("ERROR: cannot find stage1 executable at \"{}\"", &stage0.config.stage1_system_path);
-                log(&msg);
+                info!("{msg}");
                 return Err(msg.into());
             } else {
                 cmdname = &stage0.config.stage1_system_path;
@@ -82,7 +83,7 @@ fn local_run_stage1(
         cmdstr = format!("{} --context {} --function {} --payload {}", &cmdname, context, function, pl.as_str());
     }
 
-    log(&format!("Executing: {}", &cmdstr));
+    info!("Executing: {}", &cmdstr);
 
     let result = Command::new(cmdname)
         .args(cmdargs.clone())
@@ -93,20 +94,20 @@ fn local_run_stage1(
     };
 
     let output = result.unwrap();
-    log(&format!("Executed : {}", &cmdstr));
+    info!("Executed : {}", &cmdstr);
 
     let exit_code = match output.status.code() {
         Some(rc) => rc.to_string(),
         None => String::from("killed by signal"),
     };
-    log(&format!("RC: {}", exit_code));
+    info!("RC: {}", exit_code);
 
     let mut stdout = String::from_utf8(output.stdout.clone()).unwrap_or(String::from(""));
     if ! stdout.is_empty() {
         stdout.pop();
         let lines = stdout.split('\n');
         for line in lines {
-            log(&format!("stdout: {}", line));
+            info!("stdout: {}", line);
         }
     };
     let mut stderr = String::from_utf8(output.stderr.clone()).unwrap_or(String::from(""));
@@ -114,7 +115,7 @@ fn local_run_stage1(
         stderr.pop();
         let lines = stderr.split('\n');
         for line in lines {
-            log(&format!("stderr: {}", line));
+            info!("stderr: {}", line);
         }
     };
     

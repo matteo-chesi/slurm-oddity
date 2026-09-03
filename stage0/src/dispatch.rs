@@ -1,8 +1,21 @@
 use std::error::Error;
+use std::fs::OpenOptions;
+use std::sync::Mutex;
+use slurm_spank::{Context, Plugin, SpankHandle, spank_log_user, spank_log_error};
+use tracing_subscriber::fmt;
+use tracing::{Level, info};
 
-use slurm_spank::{Context, Plugin, SpankHandle};
-
-use crate::{SpankStage0, run_stage1, remote_run_stage1_new};
+use crate::{
+    APP_NAME,
+    ErrorDestination,
+    SpankStage0,
+    error_destination,
+    format_error_chain,
+    init_log_file,
+    run_stage1,
+    remote_run_stage1_new,
+    set_panic_hook,
+};
 use crate::args::*;
 use crate::config::{dispatch_load_config};
 use crate::state::{dispatch_load_state};
@@ -10,36 +23,32 @@ use crate::containers::{
     container_join_from_stage1_output,
 };
 
+macro_rules! log_init {
+    () => {
+        let span = tracing::span!(tracing::Level::INFO, APP_NAME);
+        let _ = span.enter();
+    };
+}
+
 unsafe impl Plugin for SpankStage0 {
     fn init(&mut self, spank: &mut SpankHandle) -> Result<(), Box<dyn Error>> {
-        //if ! Path::new(&self.config.stage1).exists() {
-        //    log(format!("ERROR: cannot find {}", &self.config.stage1).as_str());
-        //}
+        log_init!();
+        info!("PROVA!");
 
         let context;
         let function = String::from("init");
         let payload = None;
 
         match spank.context()? {
-            
-            /*
-            Context::Slurmd => {
-                //let _ = slurmd_init(self, spank)?;
-                context  = String::from("slurmd");
-            }
-            */
-            
             Context::Local => {
-                //let _ = srun_init(self, spank)?;
+                tracing::error!("STIKAZZZZZZI!!!");
                 context  = String::from("local");
             }
             
             Context::Allocator => {
-                //let _ = alloc_init(self, spank)?;
                 context  = String::from("allocator");
             }
             Context::Remote => {
-                //let _ = slurmstepd_init(self, spank)?;
                 context  = String::from("remote");
             }
             _ => { return Ok(()); }
@@ -58,6 +67,7 @@ unsafe impl Plugin for SpankStage0 {
     }
     
     fn init_post_opt(&mut self, spank: &mut SpankHandle) -> Result<(), Box<dyn Error>> {
+        log_init!();
         //if !self.config.skybox_enabled {
         //    return Ok(());
         //}
@@ -89,6 +99,7 @@ unsafe impl Plugin for SpankStage0 {
     }
 
     fn user_init(&mut self, spank: &mut SpankHandle) -> Result<(), Box<dyn Error>> {
+        log_init!();
         //if !self.config.skybox_enabled {
         //    return Ok(());
         //}
@@ -103,6 +114,7 @@ unsafe impl Plugin for SpankStage0 {
     }
 
     fn task_init(&mut self, spank: &mut SpankHandle) -> Result<(), Box<dyn Error>> {
+        log_init!();
         //if !self.config.skybox_enabled {
         //    return Ok(());
         //}
@@ -120,6 +132,7 @@ unsafe impl Plugin for SpankStage0 {
     }
 
     fn exit(&mut self, spank: &mut SpankHandle) -> Result<(), Box<dyn Error>> {
+        //log_init!();
         //if !self.config.skybox_enabled {
         //    return Ok(());
         //}
@@ -147,7 +160,7 @@ unsafe impl Plugin for SpankStage0 {
             _ => { return Ok(()); }
         }
 
-        let _ = run_stage1(self, spank, context, function, payload);
+        //let _ = run_stage1(self, spank, context, function, payload);
         Ok(())
     }
 
@@ -168,6 +181,7 @@ unsafe impl Plugin for SpankStage0 {
     */
 
     fn task_exit(&mut self, spank: &mut SpankHandle) -> Result<(), Box<dyn Error>> {
+        //log_init!();
         //if !self.config.skybox_enabled {
         //    return Ok(());
         //}
@@ -177,11 +191,12 @@ unsafe impl Plugin for SpankStage0 {
         let payload = self.args.payload.clone();
 
         //slurmstepd_task_exit(self, spank)
-        let _ = run_stage1(self, spank, context, function, payload);
+        //let _ = run_stage1(self, spank, context, function, payload);
         Ok(())
     }
 
     fn task_init_privileged(&mut self, spank: &mut SpankHandle) -> Result<(), Box<dyn Error>> {
+        log_init!();
         //if !self.config.skybox_enabled {
         //    return Ok(());
         //}
@@ -199,6 +214,48 @@ unsafe impl Plugin for SpankStage0 {
         }
 
         let _ = run_stage1(self, spank, context, function, payload);
+        Ok(())
+    }
+
+     fn report_error(&self, spank: &mut SpankHandle, error: &dyn Error) {
+        let report = format_error_chain(error);
+
+        match spank.context().map(error_destination) {
+            Ok(ErrorDestination::User) => {
+                tracing::info!("{}", &report);
+                spank_log_user!("{}", &report);
+            }
+            Ok(ErrorDestination::Tracing) => tracing::error!("{}", report),
+            Err(context_error) => {
+                spank_log_error!(
+                    "{}; additionally failed to determine SPANK context: {}",
+                    &report,
+                    context_error
+                );
+            }
+        }
+    }
+
+    fn setup(&mut self, spank: &mut SpankHandle) -> Result<(), Box<dyn Error>> {
+        init_log_file(self, spank);
+        set_panic_hook();
+        let path = &self.log_file;
+
+        let file = match OpenOptions::new().create(false).append(true).open(path) {
+            Ok(f) => f,
+            Err(_) => return Ok(()),
+        };
+
+        let subscriber = fmt()
+            .with_writer(Mutex::new(file))
+            .with_ansi(false)
+            .with_target(false)
+            .with_level(false)
+            .with_timer(fmt::time::LocalTime::rfc_3339())
+            .with_max_level(Level::INFO)
+            .finish();
+
+        tracing::subscriber::set_global_default(subscriber)?;
         Ok(())
     }
     

@@ -10,6 +10,7 @@ crate-type = ["cdylib"]
 cfg-if = "1.0.4"
 chrono = "0.4.45"
 chrono-tz = "0.10.4"
+const_format = "0.2.36"
 gethostname = "1.1.0"
 iana-time-zone = "0.1.65"
 libc = "0.2.189"
@@ -23,7 +24,7 @@ simple-logging = "2.0.2"
 slurm-spank = "0.4.0"
 tokio = { version = "1.53.1", features = ["process", "rt", "rt-multi-thread", "io-util"] }
 toml = "0.9.5"
-tracing = "0.1"
-tracing-subscriber = "0.3.23"
+tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3", features = ["fmt", "local-time"] }
 users = "0.11.0"
 whoami = "2.1.2"

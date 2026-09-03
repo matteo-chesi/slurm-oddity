@@ -3,8 +3,9 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use serde::{Serialize, Deserialize};
 use slurm_spank::{Context, SpankHandle};
+use tracing::{info, error};
 
-use crate::{SpankStage0, log, log_error, remote_log, spank_getenv};
+use crate::{SpankStage0, remote_log, spank_getenv};
 
 const CONFIGFILE_PATH: &str = "/etc/cosmodrome-stage0.conf";
 
@@ -148,8 +149,7 @@ pub(crate) fn local_load_config(
     let config = match load_config() {
         Ok(cfg) => cfg,
         Err(e) => {
-            log_error!("{}", e);
-            log_error!("Error on configuration loading");
+            error!("Error on configuration loading: {e}");
             return Err(e);
         }
     };
@@ -167,8 +167,8 @@ pub(crate) fn local_load_config(
     }
     plugin.config = config.clone();
 
-    log(&format!("STAGE1_USER_PATH: {}", plugin.config.stage1_user_path));
-    log(&format!("STAGE1_SYSTEM_PATH: {}", plugin.config.stage1_system_path));
+    info!("STAGE1_USER_PATH: {}", plugin.config.stage1_user_path);
+    info!("STAGE1_SYSTEM_PATH: {}", plugin.config.stage1_system_path);
 
     Ok(())
 }

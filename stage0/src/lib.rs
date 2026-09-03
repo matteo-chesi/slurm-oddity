@@ -2,7 +2,8 @@ use std::error::Error;
 use std::fs::create_dir_all;
 use std::os::unix::fs::chown;
 use std::os::unix::fs::MetadataExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use const_format::formatcp;
 use serde::{Serialize, Deserialize};
 
 use slurm_spank::{Plugin, SLURM_VERSION_NUMBER, SPANK_PLUGIN, SpankHandle};
@@ -10,9 +11,17 @@ use crate::args::Stage0Args;
 use crate::config::Stage0Config;
 use crate::state::Stage0State;
 
-pub(crate) use crate::log::{log, remote_log, get_log_dirpath};
+pub(crate) use crate::log::{
+    ErrorDestination,
+    error_destination,
+    remote_log,
+    init_log_file,
+    format_error_chain,
+    get_log_dirpath,
+    set_panic_hook
+};
 pub(crate) use crate::stage1::{run_stage1, remote_run_stage1_new};
-pub(crate) use crate::state::set_local2remote_env_var;
+pub(crate) use crate::state::{set_local2remote_env_var, get_job_env};
 
 pub mod args;
 pub mod config;
@@ -25,6 +34,11 @@ pub mod state;
 //pub(crate) const SLURM_BATCH_SCRIPT: u32 = 0xfffffffb;
 pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub(crate) const PLUGIN_NAME: &str = "stage0";
+pub(crate) const APP_NAME: &str = formatcp!("{}-{}", PLUGIN_NAME, VERSION);
+pub(crate) const LOG_PATH: &str = formatcp!("${{HOME}}/.local/share/{}/log", PLUGIN_NAME);
+pub(crate) const DATETIME_FORMAT: &str = "%Y%m%d";
+pub(crate) const LOCAL_LOG_FILENAME: &str = "${DATETIME}_${CLUSTER_NAME}/local_${HOSTNAME}.log";
+pub(crate) const REMOTE_LOG_FILENAME: &str = "${DATETIME}_${CLUSTER_NAME}/job_${SLURM_JOB_ID}/${HOSTNAME}.log";
 pub(crate) const CACHE_PATH: &str = "${HOME}/.local/share/cosmodrome/cache";
 pub(crate) const LOCAL2REMOTE_VARNAME: &str = "SLURM_STAGE0_LOCAL2REMOTE_DATA";
 pub(crate) const LOCAL2REMOTE_FILENAME: &str = "local2remote_data.json";
@@ -33,6 +47,7 @@ SPANK_PLUGIN!(b"stage0", SLURM_VERSION_NUMBER, SpankStage0);
 
 #[derive(Serialize, Default)]
 struct SpankStage0 {
+    log_file: PathBuf,
     args: Stage0Args,
     config: Stage0Config,
     state: Stage0State,
@@ -41,13 +56,6 @@ struct SpankStage0 {
 #[derive(Deserialize, Serialize, Default)]
 struct ConsoleOutput {
     console_out: String,
-}
-
-#[macro_export]
-macro_rules! log_error {
-    ($($arg:tt)*) => ({
-        slurm_spank::spank_log(slurm_spank::LogLevel::Error, &format!("[{}] {}", $crate::get_plugin_name(), &format!($($arg)*)));
-    })
 }
 
 pub(crate) fn get_plugin_name() -> String {
