@@ -14,7 +14,7 @@ use tracing::{info};
 
 use slurm_spank::{Context, SpankHandle, spank_log_user};
 
-use crate::{ConsoleOutput, SpankStage0, remote_log, set_local2remote_env_var, spank_getenv};
+use crate::{ConsoleOutput, SpankStage0, set_local2remote_env_var, spank_getenv};
 
 pub(crate) fn run_stage1(
     stage0: &mut SpankStage0,
@@ -141,7 +141,7 @@ fn remote_run_stage1(
         pl = payload.clone().unwrap();
         fstr = format!("{}({},{},{})", "run_stage1", context, function, pl.as_str())
     }
-    remote_log(stage0, spank, &format!("[UID: {}] Calling: {}", &cur_uid, &fstr));
+    info!("[UID: {}] Calling: {}", &cur_uid, &fstr);
 
     let prev_dir = match current_dir() {
         Ok(d) => d,
@@ -168,7 +168,7 @@ fn remote_run_stage1(
         if ! Path::new(&stage0.config.stage1_user_path).exists() {
             if ! Path::new(&stage0.config.stage1_system_path).exists() {
                 let msg = format!("ERROR: cannot find stage1 executable at \"{}\"", &stage0.config.stage1_system_path);
-                remote_log(stage0, spank, &msg);
+                info!("{msg}");
                 return Err(msg.into());
             } else {
                 cmd2run = stage0.config.stage1_system_path.clone();
@@ -199,7 +199,7 @@ fn remote_run_stage1(
         if ! Path::new(&stage0.config.stage1_user_path).exists() {
             if ! Path::new(&stage0.config.stage1_system_path).exists() {
                 let msg = format!("ERROR: cannot find stage1 executable at \"{}\"", &stage0.config.stage1_system_path);
-                remote_log(stage0, spank, &msg);
+                info!("{msg}");
                 return Err(msg.into());
             } else {
                 cmdname = stage0.config.stage1_system_path.clone();
@@ -217,7 +217,7 @@ fn remote_run_stage1(
         }
     }
 
-    remote_log(stage0, spank, &format!("Executing: {}", &cmdstr));
+    info!("Executing: {}", &cmdstr);
 
     let result = Command::new(cmdname)
         .args(cmdargs)
@@ -228,20 +228,20 @@ fn remote_run_stage1(
     }
     
     let output = result.unwrap();
-    remote_log(stage0, spank, &format!("Executed : {}", &cmdstr));
+    info!("Executed : {}", &cmdstr);
 
     let exit_code = match output.status.code() {
         Some(rc) => rc.to_string(),
         None => String::from("killed by signal"),
     };
-    remote_log(stage0, spank, &format!("RC: {}", exit_code));
+    info!("RC: {}", exit_code);
 
     let mut stdout = String::from_utf8(output.stdout.clone()).unwrap_or(String::from(""));
     if ! stdout.is_empty() {
         stdout.pop();
         let lines = stdout.split('\n');
         for line in lines {
-            remote_log(stage0, spank, &format!("stdout: {}", line));
+            info!("stdout: {}", line);
         }
     };
     let mut stderr = String::from_utf8(output.stderr.clone()).unwrap_or(String::from(""));
@@ -249,7 +249,7 @@ fn remote_run_stage1(
         stderr.pop();
         let lines = stderr.split('\n');
         for line in lines {
-            remote_log(stage0, spank, &format!("stderr: {}", line));
+            info!("stderr: {}", line);
         }
     };
     
@@ -273,7 +273,7 @@ pub(crate) fn remote_run_stage1_new(
         pl = payload.clone().unwrap();
         fstr = format!("{}({},{},{})", "run_stage1", context, function, pl.as_str())
     }
-    remote_log(stage0, spank, &format!("[UID: {}] Calling: {}", &cur_uid, &fstr));
+    info!("[UID: {}] Calling: {}", &cur_uid, &fstr);
 
     let prev_dir = match current_dir() {
         Ok(d) => d,
@@ -300,7 +300,7 @@ pub(crate) fn remote_run_stage1_new(
         if ! Path::new(&stage0.config.stage1_user_path).exists() {
             if ! Path::new(&stage0.config.stage1_system_path).exists() {
                 let msg = format!("ERROR: cannot find stage1 executable at \"{}\"", &stage0.config.stage1_system_path);
-                remote_log(stage0, spank, &msg);
+                info!("{msg}");
                 return Err(msg.into());
             } else {
                 cmd2run = stage0.config.stage1_system_path.clone();
@@ -331,7 +331,7 @@ pub(crate) fn remote_run_stage1_new(
         if ! Path::new(&stage0.config.stage1_user_path).exists() {
             if ! Path::new(&stage0.config.stage1_system_path).exists() {
                 let msg = format!("ERROR: cannot find stage1 executable at \"{}\"", &stage0.config.stage1_system_path);
-                remote_log(stage0, spank, &msg);
+                info!("{msg}");
                 return Err(msg.into());
             } else {
                 cmdname = stage0.config.stage1_system_path.clone();
@@ -349,7 +349,7 @@ pub(crate) fn remote_run_stage1_new(
         }
     }
 
-    remote_log(stage0, spank, &format!("Executing: {}", &cmdstr));
+    info!("Executing: {}", &cmdstr);
 
     let mut child = match Command::new(cmdname)
         .args(cmdargs)
@@ -387,31 +387,21 @@ pub(crate) fn remote_run_stage1_new(
     }
 
     let result = child.wait();
-    remote_log(stage0, spank, &format!("WAIT ENDED"));
+    info!("WAIT ENDED");
 
     if result.is_err() {
         return Err("failed to execute process".into());
     }
     
     let status = result.unwrap();
-    remote_log(stage0, spank, &format!("Executed : {}", &cmdstr));
+    info!("Executed : {}", &cmdstr);
 
     let exit_code = match status.code() {
         Some(rc) => rc.to_string(),
         None => String::from("killed by signal"),
     };
-    remote_log(stage0, spank, &format!("RC: {}", exit_code));
+    info!("RC: {}", exit_code);
 
-    /*
-    let mut stdout = String::from_utf8(output.stdout.clone()).unwrap_or(String::from(""));
-    if ! stdout.is_empty() {
-        stdout.pop();
-        let lines = stdout.split('\n');
-        for line in lines {
-            remote_log(stage0, spank, &format!("stdout: {}", line));
-        }
-    };
-    */
     let mut stderr_vec = vec![];
     let _ = stderr.read_to_end(&mut stderr_vec);
     let mut stderr = String::from_utf8(stderr_vec).unwrap_or(String::from(""));
@@ -419,7 +409,7 @@ pub(crate) fn remote_run_stage1_new(
         stderr.pop();
         let lines = stderr.split('\n');
         for line in lines {
-            remote_log(stage0, spank, &format!("stderr: {}", line));
+            info!("stderr: {}", line);
         }
     };
     
@@ -451,5 +441,5 @@ fn handle_stage1_stdout_msg(
         spank_log_user!("{}", console_out.unwrap().console_out);
     };
 
-    remote_log(stage0, spank, &format!("stdout: {}", &msg));
+    info!("stdout: {}", &msg);
 }

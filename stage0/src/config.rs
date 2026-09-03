@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 use slurm_spank::{Context, SpankHandle};
 use tracing::{info, error};
 
-use crate::{SpankStage0, remote_log, spank_getenv};
+use crate::{SpankStage0, spank_getenv};
 
 const CONFIGFILE_PATH: &str = "/etc/cosmodrome-stage0.conf";
 
@@ -192,8 +192,8 @@ pub(crate) fn remote_load_config(
     };
     plugin.config = config;
 
-    remote_log(plugin, spank, &format!("STAGE1_USER_PATH: {}", plugin.config.stage1_user_path));
-    remote_log(plugin, spank, &format!("STAGE1_SYSTEM_PATH: {}", plugin.config.stage1_system_path));
+    info!("STAGE1_USER_PATH: {}", plugin.config.stage1_user_path);
+    info!("STAGE1_SYSTEM_PATH: {}", plugin.config.stage1_system_path);
 
     Ok(())
 }

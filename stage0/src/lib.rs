@@ -14,7 +14,6 @@ use crate::state::Stage0State;
 pub(crate) use crate::log::{
     ErrorDestination,
     error_destination,
-    remote_log,
     init_log_file,
     format_error_chain,
     get_log_dirpath,

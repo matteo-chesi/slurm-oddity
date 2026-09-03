@@ -13,7 +13,7 @@ use tracing::{info};
 use slurm_spank::{Context, SpankHandle};
 use raster::{expand_vars_string};
 
-use crate::{CACHE_PATH, LOCAL2REMOTE_VARNAME, LOCAL2REMOTE_FILENAME, create_dir_path, SpankStage0, get_log_dirpath, remote_log, spank_getenv};
+use crate::{CACHE_PATH, LOCAL2REMOTE_VARNAME, LOCAL2REMOTE_FILENAME, create_dir_path, SpankStage0, get_log_dirpath, spank_getenv};
 
 #[derive(Serialize, Deserialize)]
 pub(crate) struct Stage0State {
@@ -182,9 +182,9 @@ pub(crate) fn remote_load_state(
         },
     };
     // We need the JobID to build the folder name.
-    remote_log(plugin, spank, &format!("STAGE0_LOGDIR: {}", value));
+    info!("STAGE0_LOGDIR: {}", value);
     //Moved here because we need to know the folder to log in
-    remote_log(plugin, spank, &format!("STAGE0_JOBID: {}", &plugin.state.jobid.clone().unwrap()));
+    info!("STAGE0_JOBID: {}", &plugin.state.jobid.clone().unwrap());
 
     key = "SLURM_STAGE0_USERNAME";
     value = spank_getenv(spank, key).to_string();
@@ -198,14 +198,14 @@ pub(crate) fn remote_load_state(
             Some(value.clone())
         },
     };
-    remote_log(plugin, spank, &format!("STAGE0_USERNAME: {}", value));
+    info!("STAGE0_USERNAME: {}", value);
 
     key = "SLURM_STAGE0_UID";
     plugin.state.uid = match spank.job_uid() {
         Ok(uid) => {
             let struid = uid.to_string();
             unsafe {std::env::set_var(key, OsStr::new(&struid));}
-            remote_log(plugin, spank, &format!("STAGE0_UID: {}", struid));
+            info!("STAGE0_UID: {}", struid);
             Some(uid)
         },
         Err(_) => {
@@ -219,7 +219,7 @@ pub(crate) fn remote_load_state(
         Ok(gid) => {
             let strgid = gid.to_string();
             unsafe {std::env::set_var(key, OsStr::new(&strgid));}
-            remote_log(plugin, spank, &format!("STAGE0_GID: {}", strgid));
+            info!("STAGE0_GID: {}", strgid);
             Some(gid)
         },
         Err(_) => {
@@ -267,7 +267,7 @@ pub(crate) fn remote_load_state(
         Some(u) => u,
         None => &String::from("None"),
     };
-    remote_log(plugin, spank, &format!("STAGE0_CALLER_ID: {}", caller_id));
+    info!("STAGE0_CALLER_ID: {}", caller_id);
 
     key = LOCAL2REMOTE_VARNAME;
     value = spank_getenv(spank, key).to_string();
@@ -279,10 +279,10 @@ pub(crate) fn remote_load_state(
             unsafe {std::env::set_var(key, OsStr::new(&value));}
         },
     }
-    remote_log(plugin, spank, &format!("{}: {}", key, value));
+    info!("{}: {}", key, value);
 
     // Translate job env
-    remote_log(plugin, spank, &format!("STIKKAZZI"));
+    info!("STIKKAZZI");
     let vc = get_job_arg(spank);
     plugin.state.job_arg = vc.clone();
     let hm = get_job_env(spank);
@@ -291,16 +291,16 @@ pub(crate) fn remote_load_state(
     // Write input.json
     jobarg2cache(plugin, spank); 
     jobenv2cache(plugin, spank); 
-    remote_log(plugin, spank, &format!("AMMAZZI"));
+    info!("AMMAZZI");
     
     let mut i = 0;
     for a in vc.clone() {
-        remote_log(plugin, spank, &format!("JOBARG MEMBER: {i} = {a}"));
+        info!("JOBARG MEMBER: {i} = {a}");
         i = i + 1;
     }
     
     for (k,v) in hm.clone() {
-        remote_log(plugin, spank, &format!("JOBENV VARIABLE: {k} = {v}"));
+        info!("JOBENV VARIABLE: {k} = {v}");
     }
 
     Ok(())
@@ -399,11 +399,11 @@ pub(crate) fn set_local2remote_env_var(plugin: &mut SpankStage0) {
 
 pub(crate) fn jobenv2cache(plugin: &mut SpankStage0, spank: &mut SpankHandle) {
 
-    remote_log(plugin, spank, &format!("STIKKAZZI"));
+    info!("STIKKAZZI");
     let cache_dir_path = get_cache_dir_path(plugin);
     let _ = create_dir_path(plugin, Path::new(&cache_dir_path));
     let cache_file_path = format!("{cache_dir_path}/jobenv.json");
-    remote_log(plugin, spank, &format!("FILE: {}", cache_file_path));
+    info!("FILE: {}", cache_file_path);
 
     let content = match serde_json::to_string(&plugin.state.job_env) {
         Ok(s) => s,
@@ -427,7 +427,7 @@ pub(crate) fn jobenv2cache(plugin: &mut SpankStage0, spank: &mut SpankHandle) {
     };
     let _ = file.flush();
     let _ = file.sync_all();
-    remote_log(plugin, spank, &format!("BIGAZZI"));
+    info!("BIGAZZI");
 }
 
 pub(crate) fn jobarg2cache(plugin: &mut SpankStage0, _spank: &mut SpankHandle) {
