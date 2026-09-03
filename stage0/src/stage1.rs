@@ -4,7 +4,7 @@ use std::ffi::OsStr;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader, Read, Write};
 //use std::process::Stdio;
 //use tokio::runtime::Runtime;
 //use tokio::process::{Command as TokioCommand};
@@ -14,7 +14,7 @@ use tracing::{info};
 
 use slurm_spank::{Context, SpankHandle, spank_log_user};
 
-use crate::{ConsoleOutput, SpankStage0, set_local2remote_env_var, spank_getenv};
+use crate::{ConsoleOutput, IOData, SpankStage0, set_local2remote_env_var, spank_getenv};
 
 pub(crate) fn run_stage1(
     stage0: &mut SpankStage0,
@@ -443,3 +443,181 @@ fn handle_stage1_stdout_msg(
 
     info!("stdout: {}", &msg);
 }
+
+pub(crate) fn run_stage1_new2(
+    stage0: &mut SpankStage0,
+    spank: &mut SpankHandle,
+    data: &mut IOData)
+-> Result<String, Box<dyn Error>> {
+
+    let context = data.exchange.slurm_context.clone();
+    let function = data.exchange.slurm_function.clone();
+    let payload = data.exchange.payload.clone();
+
+    let mut fstr = format!("{}({},{},{})", "run_stage1", context, function, "None");
+    let mut pl;
+    let cur_uid = get_current_uid();
+    if payload.is_some() {
+        pl = payload.clone().unwrap();
+        fstr = format!("{}({},{},{})", "run_stage1", context, function, pl.as_str())
+    }
+    info!("[UID: {}] Calling: {}", &cur_uid, &fstr);
+
+    let prev_dir = match current_dir() {
+        Ok(d) => d,
+        Err(_) => PathBuf::from("/"),
+    };
+    let cur_dir = spank_getenv(spank, "PWD");
+    let _ = set_current_dir(cur_dir);
+    
+    if function == "task_init" {
+        set_job_home_env_var(spank);
+    }
+
+    let cmdname;
+    let cmd2run;
+    let mut cmdargs = vec![];
+    let mut cmdstr;
+    let username;
+    let innercmd;
+    if cur_uid == 0 {
+        if context != "remote" {
+            return Err("Cannot run stage1 as root".into());
+        }
+
+        if stage0.state.username.is_none() {
+            return Err("Unknown username".into());
+        }
+        
+        if ! Path::new(&stage0.config.stage1_user_path).exists() {
+            if ! Path::new(&stage0.config.stage1_system_path).exists() {
+                let msg = format!("ERROR: cannot find stage1 executable at \"{}\"", &stage0.config.stage1_system_path);
+                info!("{msg}");
+                return Err(msg.into());
+            } else {
+                cmd2run = stage0.config.stage1_system_path.clone();
+            }
+        } else {
+            cmd2run = stage0.config.stage1_user_path.clone();
+        }
+
+        cmdname = String::from("/usr/bin/su");
+        username = stage0.state.username.clone().unwrap();
+        if payload.is_some() {
+            pl = payload.clone().unwrap();
+            innercmd = format!("{} --context {} --function {} --payload {}", &cmd2run, &context, &function, pl.as_str());
+            cmdargs = vec![
+                &username,
+                "-c", &innercmd,
+            ];
+            cmdstr = format!("{} {} -c {} --context {} --function {} --payload {}", &cmdname, &username, &cmd2run ,&context, &function, pl.as_str());
+        } else {
+            innercmd = format!("{} --context {} --function {}", &cmd2run, &context, &function);
+            cmdargs = vec![
+                &username,
+                "-c", &innercmd,
+            ];
+            cmdstr = format!("{} {} -c {} --context {} --function {}", &cmdname, &username, &cmd2run, &context, &function);
+        }
+    } else {
+        if ! Path::new(&stage0.config.stage1_user_path).exists() {
+            if ! Path::new(&stage0.config.stage1_system_path).exists() {
+                let msg = format!("ERROR: cannot find stage1 executable at \"{}\"", &stage0.config.stage1_system_path);
+                info!("{msg}");
+                return Err(msg.into());
+            } else {
+                cmdname = stage0.config.stage1_system_path.clone();
+            }
+        } else {
+            cmdname = stage0.config.stage1_user_path.clone();
+        }
+        cmdargs = vec!["--context", &context, "--function", &function];
+        cmdstr = format!("{} --context {} --function {}", &cmdname, context, function);
+        if payload.is_some() {
+            pl = payload.clone().unwrap();
+            cmdargs.push("--payload");
+            cmdargs.push(pl.as_str());
+            cmdstr = format!("{} --context {} --function {} --payload {}", &cmdname, context, function, pl.as_str());
+        }
+    }
+
+    info!("Executing: {}", &cmdstr);
+
+    let input_json = serde_json::to_vec(&data)?; 
+
+    let mut child = match Command::new(cmdname)
+        .args(cmdargs)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn() {
+        Ok(c) => c,
+        Err(_) => {
+            return Err("failed to spawn command".into());
+        },
+    };
+
+    let mut child_stdin = child.stdin.take().unwrap();
+    child_stdin.write_all(&input_json)?;
+
+    let stdout = match child.stdout.take() {
+        Some(out) => out,
+        None => {
+            return Err("failed to capture stdout".into());
+        },
+    };
+    
+    let mut stderr = match child.stderr.take() {
+        Some(err) => err,
+        None => {
+            return Err("failed to capture stderr".into());
+        },
+    };
+
+    let reader = BufReader::new(stdout);
+
+    let mut msg_out = String::from("{}");
+    for ret_msg in reader.lines() {
+        if ret_msg.is_ok() {
+            msg_out = ret_msg.unwrap().clone();
+            handle_stage1_stdout_msg(stage0, spank, &msg_out);
+        }
+    }
+
+    let result = child.wait();
+    info!("WAIT ENDED");
+
+    if result.is_err() {
+        return Err("failed to execute process".into());
+    }
+    
+    let status = result.unwrap();
+    info!("Executed : {}", &cmdstr);
+
+    let exit_code = match status.code() {
+        Some(rc) => rc.to_string(),
+        None => String::from("killed by signal"),
+    };
+    info!("RC: {}", exit_code);
+
+    let mut stderr_vec = vec![];
+    let _ = stderr.read_to_end(&mut stderr_vec);
+    let mut stderr = String::from_utf8(stderr_vec).unwrap_or(String::from(""));
+    if ! stderr.is_empty() {
+        stderr.pop();
+        let lines = stderr.split('\n');
+        for line in lines {
+            info!("stderr: {}", line);
+        }
+    };
+
+    let _ = set_current_dir(prev_dir);
+
+    if ( context == "local" || context == "allocator" ) &&
+        function == "init_post_opt" {
+            set_local2remote_env_var(stage0);
+    }
+
+    return Ok(msg_out);
+}
+

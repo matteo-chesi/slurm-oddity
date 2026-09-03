@@ -11,8 +11,10 @@ use crate::{
     SpankStage0,
     error_destination,
     format_error_chain,
+    get_iodata,
     init_log_file,
     run_stage1,
+    run_stage1_new2,
     remote_run_stage1_new,
     set_panic_hook,
 };
@@ -57,11 +59,13 @@ unsafe impl Plugin for SpankStage0 {
         // Required to understand where to log.
         dispatch_load_state(self, spank)?;
         dispatch_load_config(self, spank)?;
+        let mut io_data = get_iodata(self, spank, context.clone(), function.clone(), payload.clone())?;
 
 
         let _ = register_plugin_args(spank)?;
 
-        let _ = run_stage1(self, spank, context, function, payload);
+        //let _ = run_stage1(self, spank, context, function, payload);
+        let output = run_stage1_new2(self, spank, &mut io_data)?;
 
         Ok(())
     }

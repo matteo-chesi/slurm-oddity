@@ -15,7 +15,7 @@ pub struct RawStage0Config {
     stage1_system_path: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Stage0Config {
     #[serde(default = "get_default_stage1_user_path")]
     pub stage1_user_path: String,

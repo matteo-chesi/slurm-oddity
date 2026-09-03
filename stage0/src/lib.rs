@@ -7,8 +7,9 @@ use const_format::formatcp;
 use serde::{Serialize, Deserialize};
 
 use slurm_spank::{Plugin, SLURM_VERSION_NUMBER, SPANK_PLUGIN, SpankHandle};
-use crate::args::Stage0Args;
-use crate::config::Stage0Config;
+use crate::args::{Stage0Args, get_args};
+use crate::config::{Stage0Config, load_config};
+use crate::iodata::{IOData, DataSource, DataExchange, get_iodata};
 use crate::state::Stage0State;
 
 pub(crate) use crate::log::{
@@ -19,7 +20,7 @@ pub(crate) use crate::log::{
     get_log_dirpath,
     set_panic_hook
 };
-pub(crate) use crate::stage1::{run_stage1, remote_run_stage1_new};
+pub(crate) use crate::stage1::{run_stage1, run_stage1_new2, remote_run_stage1_new};
 pub(crate) use crate::state::{set_local2remote_env_var, get_job_env};
 
 pub mod args;
@@ -27,6 +28,7 @@ pub mod config;
 pub mod containers;
 pub mod dispatch;
 pub mod log;
+pub mod iodata;
 pub mod stage1;
 pub mod state;
 
@@ -34,11 +36,14 @@ pub mod state;
 pub(crate) const NAME: &str = "slurm-oddity";
 pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub(crate) const PLUGIN_NAME: &str = "stage0";
+pub(crate) const COMMAND_NAME: &str = "stage1";
 pub(crate) const APP_NAME: &str = formatcp!("{}-{}", PLUGIN_NAME, VERSION);
 pub(crate) const LOG_PATH: &str = formatcp!("${{HOME}}/.local/share/{}/log", NAME);
 pub(crate) const DATETIME_FORMAT: &str = "%Y%m%d";
 pub(crate) const LOCAL_LOG_FILENAME: &str = formatcp!("${{DATETIME}}_${{CLUSTER_NAME}}/local_${{HOSTNAME}}_{}.log", PLUGIN_NAME);
 pub(crate) const REMOTE_LOG_FILENAME: &str = formatcp!("${{DATETIME}}_${{CLUSTER_NAME}}/job_${{SLURM_JOB_ID}}/${{HOSTNAME}}_{}.log", PLUGIN_NAME);
+pub(crate) const COMMAND_LOCAL_LOG_FILENAME: &str = formatcp!("${{DATETIME}}_${{CLUSTER_NAME}}/local_${{HOSTNAME}}_{}.log", COMMAND_NAME);
+pub(crate) const COMMAND_REMOTE_LOG_FILENAME: &str = formatcp!("${{DATETIME}}_${{CLUSTER_NAME}}/job_${{SLURM_JOB_ID}}/${{HOSTNAME}}_{}.log", COMMAND_NAME);
 pub(crate) const CACHE_PATH: &str = formatcp!("${{HOME}}/.local/share/{}/cache", NAME);
 pub(crate) const LOCAL2REMOTE_VARNAME: &str = "SLURM_STAGE0_LOCAL2REMOTE_DATA";
 pub(crate) const LOCAL2REMOTE_FILENAME: &str = "local2remote_data.json";
@@ -56,14 +61,6 @@ struct SpankStage0 {
 #[derive(Deserialize, Serialize, Default)]
 struct ConsoleOutput {
     console_out: String,
-}
-
-pub(crate) fn get_plugin_name() -> String {
-    return String::from(PLUGIN_NAME);
-}
-
-pub(crate) fn get_versioned_plugin_name() -> String {
-    return String::from(format!("{}-v{}", PLUGIN_NAME, VERSION));
 }
 
 pub(crate) fn spank_getenv(spank: &mut SpankHandle, var: &str) -> String {
@@ -106,12 +103,3 @@ pub(crate) fn create_dir_path(plugin: &mut SpankStage0, dir_path: &Path) -> Resu
     }
     Ok(())
 }
-
-/*
-pub(crate) fn spank_setenv(spank: &mut SpankHandle, name: &str, value: &str) -> Result<(),String> {
-    match spank.setenv(name, value, true) {
-        Ok(r) => Ok(r),
-        Err(_) => { return Err(format!("Cannot set variable {}={}", name, value)); },
-    }
-}
-*/

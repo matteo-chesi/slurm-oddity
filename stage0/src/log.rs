@@ -3,28 +3,28 @@ use std::env::{home_dir, remove_var, set_var, var};
 use std::error::Error;
 use std::fs::{
     File,
-    OpenOptions,
+    //OpenOptions,
     create_dir_all,
 };
-use std::io::Write;
+//use std::io::Write;
 use std::os::unix::fs::{chown, MetadataExt};
 use std::panic::PanicHookInfo;
 use std::path::{Path, PathBuf};
-use chrono::{Utc, Local};
-use chrono_tz::Tz;
-use gethostname::gethostname;
+use chrono::{Local};
+//use chrono::{Utc, Local};
+//use chrono_tz::Tz;
+//use gethostname::gethostname;
 
 use slurm_spank::{Context, SpankHandle};
 use raster::expand_vars_string;
 
 use crate::{
-    APP_NAME,
+    //APP_NAME,
     DATETIME_FORMAT,
     LOG_PATH,
     LOCAL_LOG_FILENAME,
     REMOTE_LOG_FILENAME,
     SpankStage0,
-    get_versioned_plugin_name,
     get_job_env
 };
 /*
@@ -45,6 +45,7 @@ pub(crate) fn get_log_dirpath() -> String {
     return log_dirpath.into_os_string().to_string_lossy().to_string();
 }
 
+/*
 pub(crate) fn remote_log(plugin: &mut SpankStage0, _spank: &mut SpankHandle, arg: &str) {
 
     let value = match &plugin.state.stage0_logdir_path {
@@ -220,13 +221,13 @@ fn stage0_log(log_dirpath: PathBuf, hostname: String, arg: &str) {
     let local_time = now.with_timezone(&local_tz); 
     let timestamp = local_time.format("%Y-%m-%dT%H:%M:%S%.3f");
 
-    let msg = String::from(format!("[{}] {} - {} - {}", timestamp, hostname, get_versioned_plugin_name(), arg));
+    let msg = String::from(format!("[{}] {} - {} - {}", timestamp, hostname, APP_NAME, arg));
 
     let _ = writeln!(file, "{}", msg);
     let _ = file.flush();
     let _ = file.sync_all();
 }
-
+*/
 pub(crate) fn set_panic_hook() {
     let prev_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {
