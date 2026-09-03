@@ -31,14 +31,15 @@ pub mod stage1;
 pub mod state;
 
 //pub(crate) const SLURM_BATCH_SCRIPT: u32 = 0xfffffffb;
+pub(crate) const NAME: &str = "slurm-oddity";
 pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub(crate) const PLUGIN_NAME: &str = "stage0";
 pub(crate) const APP_NAME: &str = formatcp!("{}-{}", PLUGIN_NAME, VERSION);
-pub(crate) const LOG_PATH: &str = formatcp!("${{HOME}}/.local/share/{}/log", PLUGIN_NAME);
+pub(crate) const LOG_PATH: &str = formatcp!("${{HOME}}/.local/share/{}/log", NAME);
 pub(crate) const DATETIME_FORMAT: &str = "%Y%m%d";
-pub(crate) const LOCAL_LOG_FILENAME: &str = "${DATETIME}_${CLUSTER_NAME}/local_${HOSTNAME}.log";
-pub(crate) const REMOTE_LOG_FILENAME: &str = "${DATETIME}_${CLUSTER_NAME}/job_${SLURM_JOB_ID}/${HOSTNAME}.log";
-pub(crate) const CACHE_PATH: &str = "${HOME}/.local/share/cosmodrome/cache";
+pub(crate) const LOCAL_LOG_FILENAME: &str = formatcp!("${{DATETIME}}_${{CLUSTER_NAME}}/local_${{HOSTNAME}}_{}.log", PLUGIN_NAME);
+pub(crate) const REMOTE_LOG_FILENAME: &str = formatcp!("${{DATETIME}}_${{CLUSTER_NAME}}/job_${{SLURM_JOB_ID}}/${{HOSTNAME}}_{}.log", PLUGIN_NAME);
+pub(crate) const CACHE_PATH: &str = formatcp!("${{HOME}}/.local/share/{}/cache", NAME);
 pub(crate) const LOCAL2REMOTE_VARNAME: &str = "SLURM_STAGE0_LOCAL2REMOTE_DATA";
 pub(crate) const LOCAL2REMOTE_FILENAME: &str = "local2remote_data.json";
 

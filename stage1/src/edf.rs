@@ -2,14 +2,15 @@ use std::env::var;
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
+use tracing::{info};
 use raster::{EDF, render, mount::SarusMount};
-use crate::{SLURM_BATCH_SCRIPT, LOCAL2REMOTE_VARNAME, State, log::log, get_cache_dir_path};
+use crate::{SLURM_BATCH_SCRIPT, LOCAL2REMOTE_VARNAME, State, get_cache_dir_path};
 
 pub(crate) fn local_load_edf(state: &mut State) {
     let edf_name = match &state.args.payload {
         Some(name) => String::from(name),
         None => {
-            log(&format!("Error: cannot read payload argument"));
+            info!("Error: cannot read payload argument");
             return ();
         }
     };
@@ -17,7 +18,7 @@ pub(crate) fn local_load_edf(state: &mut State) {
     let edf = match render(edf_name.clone()) {
         Ok(f) => f,
         Err(_) => {
-            log(&format!("Error: cannot render edf \"{edf_name}\""));
+            info!("Error: cannot render edf \"{edf_name}\"");
             return ();
         },
     };
@@ -31,22 +32,11 @@ pub(crate) fn remote_load_edf(state: &mut State) {
     let edf = match get_edf_from_local2remote_data_env() {
         Ok(v) => v,
         Err(_) => {
-            log(&format!("Error: cannot parse EDF from environment variable"));
+            info!("Error: cannot parse EDF from environment variable");
             return ();
         },
     };
 
-    /*
-    let edf = match cache2edf() {
-        Ok(v) => v,
-        Err(_) => {
-            log(&format!("Error: cannot parse EDF from cache"));
-            return ();
-        },
-
-    };
-    */
-    
     state.edf = Some(edf);
 }
 
@@ -84,7 +74,7 @@ fn get_edf_from_local2remote_data_env() -> Result<EDF, String> {
     let l2r_str = match var(LOCAL2REMOTE_VARNAME) {
         Ok(s) => s,
         Err(_) => {
-            log(&format!("cannot read {LOCAL2REMOTE_VARNAME} environment variable"));
+            info!("cannot read {LOCAL2REMOTE_VARNAME} environment variable");
             return Err(format!("cannot read {LOCAL2REMOTE_VARNAME} environment variable"));
             },
     };
@@ -92,7 +82,7 @@ fn get_edf_from_local2remote_data_env() -> Result<EDF, String> {
     let edf: EDF = match serde_json::from_str(&l2r_str) {
         Ok(f) => f,
         Err(e) => {
-            log(&format!("couldn't parse {LOCAL2REMOTE_VARNAME} environment variable value as a valid EDF: {e}"));
+            info!("couldn't parse {LOCAL2REMOTE_VARNAME} environment variable value as a valid EDF: {e}");
             return Err(format!("couldn't parse {LOCAL2REMOTE_VARNAME} environment variable value as a valid EDF: {e}"));
         },
     };
@@ -160,7 +150,7 @@ pub(crate) fn modify_edf_for_sbatch(
         Some(j) => j,
         None => {
             let msg = "Error: cannot find job data at this stage";
-            log(msg);
+            info!(msg);
             return Ok(());
         }
     };
@@ -180,7 +170,7 @@ pub(crate) fn modify_edf_for_sbatch(
             Some(s) => s,
             None => {
                 let msg = "Error: cannot read job argv[0]";
-                log(msg);
+                info!(msg);
                 return Ok(());
             }
         };
@@ -192,12 +182,12 @@ pub(crate) fn modify_edf_for_sbatch(
             Ok(ok) => ok,
             Err(_) => {
                 let msg = "Error: cannot create sbatch script mount defintion";
-                log(msg);
+                info!(msg);
                 return Ok(());
             }
         };
 
-        log(&format!("NEW MOUNT: {}", sbatch_script));
+        info!("NEW MOUNT: {}", sbatch_script);
         edf.mounts.append(&mut vec![sm]);
 
         state.edf = Some(edf);

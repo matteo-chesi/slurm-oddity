@@ -2,10 +2,11 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::fs::read_to_string;
 use std::time::Instant;
+use tracing::{info};
 
 use sarus_suite_podman_driver::{self as pmd, ContainerCtx, PodmanCtx};
 
-use crate::{State, log, setup_imagestore};
+use crate::{State, setup_imagestore};
 
 pub(crate) const PODMAN_PIDFILE_NAME: &str = "pidfile";
 
@@ -118,33 +119,33 @@ pub(crate) fn podman_pull(
     .with_env("PARALLAX_MP_LOGFILE", config.parallax_mp_logfile.clone());
 
     if !pmd_image_exists(&edf.image, &ro_ctx)? {
-        log(&format!(
+        info!(
             "pulling image \"{}\" from remote in local graphroot",
             edf.image
-        ));
+        );
         pmd_pull(&edf.image, &local_ctx)?;
 
         if !pmd_image_exists(&edf.image, &local_ctx)? {
             let msg = "Error: podman pull failed, cannot find image in local graphroot";
-            log(msg);
+            info!("{msg}");
             return Err(msg.into());
         }
 
-        log(&format!("migrating image \"{}\" to shared imagestore", edf.image));
+        info!("migrating image \"{}\" to shared imagestore", edf.image);
         pmd_parallax_migrate(&config.parallax_path, &migrate_ctx, &edf.image)?;
 
-        log(&format!("removing image \"{}\" from local graphroot", edf.image));
+        info!("removing image \"{}\" from local graphroot", edf.image);
         if let Err(error) = pmd_rmi(&edf.image, &local_ctx) {
-            log(&format!(
+            info!(
                 "Error: failed to remove image \"{}\" from local graphroot: {}",
                 edf.image,
                 error
-            ));
+            );
         }
 
         if !pmd_image_exists(&edf.image, &ro_ctx)? {
             let msg = "Error: couldn't find image on shared imagestore after migration";
-            log(msg);
+            info!("{msg}");
             return Err(msg.into());
         }
     }
@@ -232,11 +233,11 @@ pub(crate) fn podman_start(
     )
     .with_env("PARALLAX_MP_LOGFILE", config.parallax_mp_logfile.clone());
 
-    log(&format!(
+    info!(
         "mount env: PARALLAX_MP_UID={} PARALLAX_MP_GID={}",
         config.parallax_mp_uid.to_string(),
         config.parallax_mp_gid.to_string()
-    ));
+    );
 
     return pmd_run(&edf, &config, &run_ctx, &c_ctx, command);
 }
@@ -253,19 +254,19 @@ where
     S: AsRef<std::ffi::OsStr>,
 {
     let t0 = Instant::now();
-    log("PODMAN RUN START");
+    info!("PODMAN RUN START");
     let result = pmd::run_from_edf_output(edf, Some(p_ctx), c_ctx, cmd);
     let tend = t0.elapsed();
 
     if config.perfmon {
-        log(&format!(
+        info!(
             "skybox-perf: Podman run elapsed time: {:.6} sec",
             tend.as_secs_f64()
-        ));
+        );
     }
 
-    log(&format!("PODMAN RUN RESULT {:#?}", result));
+    info!("PODMAN RUN RESULT {:#?}", result);
     result?;
-    log("PODMAN RUN END");
+    info!("PODMAN RUN END");
     Ok(())
 }

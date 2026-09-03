@@ -11,6 +11,7 @@ use serde_json::{map::Entry, Value};
 use url::Url;
 use users::{get_current_groupname};
 use regex::Regex;
+use tracing::{info};
 
 use raster::{Config,
     config::ConfigHooks as ConfigHooks,
@@ -19,7 +20,7 @@ use raster::{Config,
     hook_run,
     update_config_by_user,
     load_config as raster_load_config};
-use crate::{AutoUpdate, State, auto_update, create_dir_path, get_cache_dir_path, log};
+use crate::{AutoUpdate, State, auto_update, create_dir_path, get_cache_dir_path};
 
 pub(crate) fn load_config() -> Config {
     //print_home();
@@ -79,7 +80,7 @@ fn cache2config() -> Result<Config, String> {
     let re = Regex::new(r"_task_\d+").unwrap();
     config_cache_file_path = re.replace(&config_cache_file_path, "").to_string();
 
-    log(&format!("Looking for config at: {}", &config_cache_file_path));
+    info!("Looking for config at: {}", &config_cache_file_path);
 
     let file_path = Path::new(&config_cache_file_path);
 
@@ -128,8 +129,8 @@ fn load_config_from_launch_control(old_config: &Config) -> Config {
 
     let query_input = build_query_input();
     let query_output = client.post(query_url.clone()).json(&query_input).send();
-    log(&format!("Query Launch Control at: {}", query_url.as_str()));
-    log(&format!("Query Input:\n{}", serde_json::to_string_pretty(&query_input).unwrap()));
+    info!("Query Launch Control at: {}", query_url.as_str());
+    info!("Query Input:\n{}", serde_json::to_string_pretty(&query_input).unwrap());
 
     let output = match query_output {
         Ok(response) => response,
@@ -146,7 +147,7 @@ fn load_config_from_launch_control(old_config: &Config) -> Config {
             return config;
         }
     };
-    log(&format!("Launch Control Response:\n{}", serde_json::to_string_pretty(&json).unwrap()));
+    info!("Launch Control Response:\n{}", serde_json::to_string_pretty(&json).unwrap());
 
     config = update_config_from_json(&mut config, &mut json);
 
@@ -418,13 +419,6 @@ fn get_auto_update_data_from_json(json: &Value) -> Option<AutoUpdate> {
     })
 }
 
-/*
-fn print_home() {
-    let home_var = env::var("HOME").unwrap_or("${HOME}".to_string());
-    log(&format!("HOME = {}", &home_var));
-}
-*/
-
 pub(crate) fn render_user_job_config(
     state: &mut State,
 ) -> Result<(), Box<dyn Error>> {
@@ -433,7 +427,7 @@ pub(crate) fn render_user_job_config(
     let edf = match &state.edf {
         Some(f) => f,
         None => {
-            log(&format!("Error: EDF shouldn't be None, here"));
+            info!("Error: EDF shouldn't be None, here");
             return Err("Error: EDF shouldn't be None, here".into());
         },
     };
@@ -445,7 +439,7 @@ pub(crate) fn render_user_job_config(
     match setup_config(&job_config, state) {
         Ok(_) => {}
         Err(_) => {
-            log(&format!("Error: cannot render user job configuration"));
+            info!("Error: cannot render user job configuration");
             return Err("Error: cannot render user job configuration".into());
         }
     }
@@ -461,43 +455,43 @@ pub(crate) fn setup_config(
 
     if config.parallax_imagestore == "" {
         let msg = "cannot find parallax_imagestore" ;
-        log(msg);
+        info!("{msg}");
         return Err(msg.into());
     }
 
     if config.parallax_mount_program == "" {
         let msg = "cannot find parallax_mount_program";
-        log(msg);
+        info!("{msg}");
         return Err(msg.into());
     }
 
     if config.parallax_path == "" {
         let msg = "cannot find parallax_path";
-        log(msg);
+        info!("{msg}");
         return Err(msg.into());
     }
 
     if config.podman_module == "" {
         let msg = "cannot find podman_module";
-        log(msg);
+        info!("{msg}");
         return Err(msg.into());
     }
 
     if config.podman_path == "" {
         let msg = "cannot find podman_path";
-        log(msg);
+        info!("{msg}");
         return Err(msg.into());
     }
 
     if config.podman_tmp_path == "" {
         let msg = "cannot find podman_tmp_path";
-        log(msg);
+        info!("{msg}");
         return Err(msg.into());
     }
 
     if config.tracking_enabled && config.tracking_tool == "" {
         let msg = "cannot find tracking_tool";
-        log(msg);
+        info!("{msg}");
         return Err(msg.into());
     }
 
@@ -516,7 +510,7 @@ pub(crate) fn setup_imagestore(config: &Config) -> Result<(), Box<dyn Error>> {
         // If imagestore does not exist, it tries to create it
         if let Err(e) = std::fs::create_dir_all(imagestore) {
             let msg = format!("cannot create parallax_imagestore: {e}");
-            log(&msg);
+            info!("{msg}");
             return Err(msg.into());
         }
     }
@@ -528,7 +522,7 @@ pub(crate) fn log_hook_ec(ec: ExecutedCommand, prefix: &str) {
     let rc = match ec.output.status.code() {
         Some(ok) => format!("{ok}"),
         None => {
-            log("{prefix} exited by signal");
+            info!("{prefix} exited by signal");
             String::from("UNKNOWN")
         }
     };
@@ -549,22 +543,22 @@ pub(crate) fn log_hook_ec(ec: ExecutedCommand, prefix: &str) {
         stderr.pop();
     };
 
-    log(&format!("CMD: {}", ec.command));
-    log(&format!("{prefix} exit code: {}", rc));
+    info!("CMD: {}", ec.command);
+    info!("{prefix} exit code: {}", rc);
 
     if stdout != "" {
         let lines = stdout.split("\n");
         for line in lines {
-            log(&format!("{prefix} stdout: {}", line));
-            log(&format!("{}", line));
+            info!("{prefix} stdout: {}", line);
+            info!("{}", line);
         }
     }
 
     if stderr != "" {
         let lines = stderr.split("\n");
         for line in lines {
-            log(&format!("{prefix} stderr: {}", line));
-            log(&format!("{}", line));
+            info!("{prefix} stderr: {}", line);
+            info!("{}", line);
         }
     }
 }

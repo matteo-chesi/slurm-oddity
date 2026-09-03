@@ -7,6 +7,7 @@ edition = "2024"
 chrono = "0.4.45"
 chrono-tz = "0.10.4"
 clap = { version = "4.5.48", features = ["derive"] }
+const_format = "0.2.36"
 gethostname = "1.1.0"
 iana-time-zone = "0.1.65"
 nix = { version = "0.31.3", features = ["user", "fs", "signal"] }
@@ -20,6 +21,8 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 shellexpand = "3.1.2"
 sysinfo = "0.39.6"
+tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3", features = ["fmt", "local-time"] }
 url = "2.5.8"
 users = "0.11.0"
 uuid = { version = "1.4.1", features = ["v4"] }

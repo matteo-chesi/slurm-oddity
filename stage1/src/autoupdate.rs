@@ -5,8 +5,9 @@ use std::io::{self};
 use std::io::Write;
 use url::Url;
 use serde::{Deserialize, Serialize};
+use tracing::{info};
 
-use crate::{CACHE_PATH, State, VERSION, expand_vars_string, create_dir_path, get_cache_dir_path, log};
+use crate::{CACHE_PATH, State, VERSION, expand_vars_string, create_dir_path, get_cache_dir_path};
 
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub(crate) struct AutoUpdate {
@@ -16,8 +17,8 @@ pub(crate) struct AutoUpdate {
 
 pub(crate) fn auto_update(au: AutoUpdate) {
     let cur_ver = get_current_version();
-    log(format!("Current   stage1 version is {}", cur_ver).as_str());
-    log(format!("Requested stage1 version is {}", au.version).as_str());
+    info!("Current   stage1 version is {}", cur_ver);
+    info!("Requested stage1 version is {}", au.version);
     if cur_ver != au.version {
         let file_path = get_target_file_path(&au.version);
         let target_file_path = Path::new(&file_path);
@@ -25,17 +26,17 @@ pub(crate) fn auto_update(au: AutoUpdate) {
             match get_new_version(&au) {
                 Ok(_) => {
                     if ! target_file_path.exists() {
-                        log(&format!("Failed to get requested stage1 version: {}", &au.version));
+                        info!("Failed to get requested stage1 version: {}", &au.version);
                         return;
                     }
                 },
                 Err(_) => {
-                    log(&format!("Failed to get requested stage1 version: {}", &au.version));
+                    info!("Failed to get requested stage1 version: {}", &au.version);
                     return;
                 },
             }
         }
-        log(&format!("Requested version available at: {}", &file_path));
+        info!("Requested version available at: {}", &file_path);
     }
     au2cache(&au);
 }
@@ -77,7 +78,7 @@ fn get_new_version(au: &AutoUpdate) -> Result<(),()> {
     let _ = create_dir_path(&dir_path, 0o700);
 
     let file_path = get_source_file_path(au);
-    log(&format!("Requested file_path = {}", &file_path));
+    info!("Requested file_path = {}", &file_path);
     if file_path == String::from("") {
         return Err(());
     } else {
@@ -96,7 +97,7 @@ fn get_new_version(au: &AutoUpdate) -> Result<(),()> {
 }
 
 fn copy_new_version(source: &Path, target: &Path) -> Result<(),()> {
-    log(&format!("Attempting to copy from : {}", &source.display()));
+    info!("Attempting to copy from : {}", &source.display());
 
     match fs::copy(source, target) {
         Ok(_) => {
@@ -109,7 +110,7 @@ fn copy_new_version(source: &Path, target: &Path) -> Result<(),()> {
 }
 
 fn download_new_version(source: &Url, target: &Path) -> Result<(),()> {
-        log(&format!("Attempting to download from : {}", &source.as_str()));
+        info!("Attempting to download from : {}", &source.as_str());
 
         let mut response = match reqwest::blocking::get(source.as_str()) {
             Ok(r) => r,

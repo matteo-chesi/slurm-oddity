@@ -1,12 +1,12 @@
 use std::error::Error;
 use std::env::{VarError, remove_var, var};
+use std::{thread, time::Duration};
 use nix::unistd::{getegid, geteuid};
 use users::{get_current_uid, get_current_gid};
-use std::{thread, time::Duration};
+use tracing::{info};
 
 use crate::{NAME,
     SLURM_BATCH_SCRIPT,
-    log::log,
     Job,
     Run,
     State,
@@ -24,7 +24,7 @@ use crate::{NAME,
 pub(crate) fn slurmstepd_init_post_opt(state: &mut State) {
     remote_load_edf(state);
     let _ = job_get_info(state);
-    log(&format!("JOB_INFO:\n{:#?}", state.job));
+    info!("JOB_INFO:\n{:#?}", state.job);
     let _ = remote_unset_env_vars(state);
 }
 
@@ -38,20 +38,20 @@ pub(crate) fn slurmstepd_task_init(state: &mut State) {
     };
     let _ = setup_folders(state);
     let _ = modify_edf_for_sbatch(state);
-    log(&format!("CONFIG:\n{:#?}", state.config));
-    log(&format!("RUN_INFO:\n{:#?}", state.run));
-    log(&format!("JOB_INFO:\n{:#?}", state.job));
-    log(&format!("JOB_ARG:\n{:#?}", state.job_arg));
-    log(&format!("JOB_ENV:\n{:#?}", state.job_env));
-    log(&format!("EDF_INFO:\n{:#?}", state.edf));
-    log("YUPPIE!");
+    info!("CONFIG:\n{:#?}", state.config);
+    info!("RUN_INFO:\n{:#?}", state.run);
+    info!("JOB_INFO:\n{:#?}", state.job);
+    info!("JOB_ARG:\n{:#?}", state.job_arg);
+    info!("JOB_ENV:\n{:#?}", state.job_env);
+    info!("EDF_INFO:\n{:#?}", state.edf);
+    info!("YUPPIE!");
     console_output("YUPPIE!");
     thread::sleep(Duration::from_millis(5000));
     console_output("YEAH!!!");
     let _ = sync_podman_pull(state);
-    log("YEAH!!");
+    info!("YEAH!!");
     let _ = sync_podman_start(state);
-    log("STAKAZZO");
+    info!("STAKAZZO");
     send_output(state);
 }
 
@@ -75,7 +75,7 @@ pub(crate) fn remote_unset_env_vars(state: &mut State) -> Result<(), Box<dyn Err
             match var(key) {
                 Err(VarError::NotPresent) => {},
                 Err(_) | _ => {
-                    log("failed to unset variable {key}");
+                    info!("failed to unset variable {key}");
                     return Err("failed to unset variable: {key}")?;
                 },
             }

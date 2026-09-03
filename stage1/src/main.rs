@@ -5,11 +5,13 @@ use std::fs::create_dir_all;
 use std::fs::Permissions;
 use std::io::{self, Write};
 use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use const_format::formatcp;
 use nix::libc::{gid_t, uid_t};
 use clap::{Parser, ValueEnum};
 use serde::{Serialize};
+use tracing::{info};
 use whoami::username;
 
 pub mod autoupdate;
@@ -28,7 +30,7 @@ use raster::{Config, EDF};
 
 use crate::autoupdate::{AutoUpdate, auto_update, get_requested_exe_path};
 use crate::edf::{local_load_edf, modify_edf_for_sbatch, remote_load_edf};
-use crate::log::log;
+use crate::log::{setup_tracing};
 use crate::config::{load_config, render_user_job_config, setup_imagestore};
 use crate::dispatch::dispatch_execution;
 use crate::jobarg::load_jobarg;
@@ -36,10 +38,15 @@ use crate::jobenv::load_jobenv;
 use crate::podman::{PODMAN_PIDFILE_NAME, podman_get_pid_from_file, podman_pull, podman_start};
 use crate::sync::{sync_podman_pull,sync_podman_start};
 
-pub(crate) const NAME: &str = "cosmodrome";
+pub(crate) const NAME: &str = "slurm-oddity";
 pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub(crate) const COMMAND_NAME: &str = "stage1";
-pub(crate) const CACHE_PATH: &str = "${HOME}/.local/share/cosmodrome/cache";
+pub(crate) const APP_NAME: &str = formatcp!("{}-{}", COMMAND_NAME, VERSION);
+pub(crate) const LOG_PATH: &str = formatcp!("${{HOME}}/.local/share/{}/log", NAME);
+pub(crate) const DATETIME_FORMAT: &str = "%Y%m%d";
+pub(crate) const LOCAL_LOG_FILENAME: &str = formatcp!("${{DATETIME}}_${{CLUSTER_NAME}}/local_${{HOSTNAME}}_{}.log", COMMAND_NAME);
+pub(crate) const REMOTE_LOG_FILENAME: &str = formatcp!("${{DATETIME}}_${{CLUSTER_NAME}}/job_${{SLURM_JOB_ID}}/${{HOSTNAME}}_{}.log", COMMAND_NAME);
+pub(crate) const CACHE_PATH: &str = formatcp!("${{HOME}}/.local/share/{}/cache", NAME);
 pub(crate) const LOCAL2REMOTE_VARNAME: &str = "SLURM_STAGE0_LOCAL2REMOTE_DATA";
 pub(crate) const SLURM_BATCH_SCRIPT: u32 = 0xfffffffb;
 
@@ -81,6 +88,7 @@ enum Function {
 
 #[derive(Serialize, Debug)]
 struct State {
+    log_file: PathBuf,
     exe_user: String,
     exe_path: String,
     exe_args: String,
@@ -122,13 +130,11 @@ pub(crate) struct ConsoleOutput {
     console_out: String,
 }
 
-pub(crate) fn get_versioned_command_name() -> String {
-    return String::from(format!("{}-v{}", COMMAND_NAME, VERSION));
-}
-
 fn run(args: &Args) {
     let mut state = load_state(args);
-    //log(&format!("STATE:\n{:#?}", state));
+    // Start Tracing
+    let span = tracing::span!(tracing::Level::INFO, APP_NAME);
+    let _ = span.enter();
 
     let requested_exe_path = get_requested_exe_path(&state);
     if state.exe_path != requested_exe_path {
@@ -161,7 +167,8 @@ pub(crate) fn load_state(args: &Args) -> State {
 
     let exe_args = env::args().collect::<Vec<String>>()[1..].join(" ");
     
-    let state = State {
+    let mut state = State {
+        log_file: PathBuf::new(), 
         exe_user: exe_user,
         exe_path: exe_path,
         exe_args: exe_args,
@@ -174,29 +181,31 @@ pub(crate) fn load_state(args: &Args) -> State {
         run: None,
     };
 
+    let _ = setup_tracing(&mut state);
+
     state
 }
 
 fn log_start(state: &State) {
-    log(&format!("Executing as \"{}\" : {} {}",
+    info!("Executing as \"{}\" : {} {}",
             state.exe_user,
             state.exe_path,
-            state.exe_args));
+            state.exe_args);
 }
 
 fn log_end(state: &State) {
     if state.args.payload.is_some() {
-        log(&format!("Executed  as \"{}\" : Context {:#?} - Function {:#?} - Payload {}", 
+        info!("Executed  as \"{}\" : Context {:#?} - Function {:#?} - Payload {}", 
                 state.exe_user, 
                 state.args.context,
                 state.args.function,
-                state.args.payload.clone().unwrap()));
+                state.args.payload.clone().unwrap());
 
     } else {
-        log(&format!("Executed  as \"{}\" : Context {:#?} - Function {:#?}",
+        info!("Executed  as \"{}\" : Context {:#?} - Function {:#?}",
                 state.exe_user,
                 state.args.context,
-                state.args.function));
+                state.args.function);
     }
 }
 
@@ -251,7 +260,7 @@ pub(crate) fn setup_folders(
         Some(r) => r.podman_tmp_path,
         None => {
             let msg = "Error: couldn't find podman_tmp_path";
-            log(msg);
+            info!(msg);
             return Err(msg.into());
         }
     };
