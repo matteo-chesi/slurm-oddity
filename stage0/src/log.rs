@@ -22,6 +22,8 @@ use crate::{
     //APP_NAME,
     DATETIME_FORMAT,
     LOG_PATH,
+    COMMAND_LOCAL_LOG_FILENAME,
+    COMMAND_REMOTE_LOG_FILENAME,
     LOCAL_LOG_FILENAME,
     REMOTE_LOG_FILENAME,
     SpankStage0,
@@ -435,6 +437,35 @@ fn set_log_filename(plugin: &mut SpankStage0, spank: &mut SpankHandle) -> Result
    plugin.log_file = log_dir.join(log_filename);
 
    Ok(())
+}
+
+pub(crate) fn get_command_log_filepath(_plugin: &mut SpankStage0, spank: &mut SpankHandle) -> Result<PathBuf, Box<dyn Error>> {
+    let log_dir = log_dir(spank);
+    let log_filename;
+
+    match spank.context().unwrap() {
+        Context::Local => {
+            set_local_environment_for_log_filename();
+            log_filename = match expand_vars_string(COMMAND_LOCAL_LOG_FILENAME.to_string(), &None) {
+                Ok(s) => PathBuf::from(s),
+                Err(_) => return Err("Cannot set log filename for local context".into()),
+            };
+            unset_local_environment_for_log_filename();
+        },
+        Context::Remote => {
+            let jobenv = get_remote_environment_for_log_filename(spank);
+            log_filename = match expand_vars_string(COMMAND_REMOTE_LOG_FILENAME.to_string(), &Some(jobenv)) {
+                Ok(s) => PathBuf::from(s),
+                Err(_) => return Err("Cannot set log filename for remote context".into()),
+            };
+        },
+        _ => return Err("Cannot set log filename".into()),
+   }
+
+   let log_filepath = log_dir.join(log_filename);
+   let log_filepathbuf = PathBuf::from(log_filepath);
+
+   Ok(log_filepathbuf)
 }
 
 pub(crate) fn init_log_file(plugin: &mut SpankStage0, spank: &mut SpankHandle) {

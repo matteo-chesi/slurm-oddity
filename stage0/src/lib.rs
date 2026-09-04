@@ -9,7 +9,7 @@ use serde::{Serialize, Deserialize};
 use slurm_spank::{Plugin, SLURM_VERSION_NUMBER, SPANK_PLUGIN, SpankHandle};
 use crate::args::{Stage0Args, get_args};
 use crate::config::{Stage0Config, load_config};
-use crate::iodata::{IOData, DataSource, DataExchange, get_iodata};
+use crate::iodata::{IOData, get_iodata, get_iodata_from_str, update_iodata};
 use crate::state::Stage0State;
 
 pub(crate) use crate::log::{
@@ -18,9 +18,10 @@ pub(crate) use crate::log::{
     init_log_file,
     format_error_chain,
     get_log_dirpath,
-    set_panic_hook
+    get_command_log_filepath,
+    set_panic_hook,
 };
-pub(crate) use crate::stage1::{run_stage1, run_stage1_new2, remote_run_stage1_new};
+pub(crate) use crate::stage1::{run_stage1_new2};
 pub(crate) use crate::state::{set_local2remote_env_var, get_job_env};
 
 pub mod args;
@@ -56,6 +57,7 @@ struct SpankStage0 {
     args: Stage0Args,
     config: Stage0Config,
     state: Stage0State,
+    pub(crate) iodata: Option<IOData>,
 }
 
 #[derive(Deserialize, Serialize, Default)]

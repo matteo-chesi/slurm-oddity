@@ -397,7 +397,7 @@ pub(crate) fn set_local2remote_env_var(plugin: &mut SpankStage0) {
     info!("MORE THAN EVER");
 }
 
-pub(crate) fn jobenv2cache(plugin: &mut SpankStage0, spank: &mut SpankHandle) {
+pub(crate) fn jobenv2cache(plugin: &mut SpankStage0, _spank: &mut SpankHandle) {
 
     info!("STIKKAZZI");
     let cache_dir_path = get_cache_dir_path(plugin);

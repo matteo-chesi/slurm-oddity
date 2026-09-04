@@ -3,7 +3,7 @@ use std::env;
 use std::error::Error;
 use std::fs::create_dir_all;
 use std::fs::Permissions;
-use std::io::{self, Write};
+//use std::io::{self, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -18,6 +18,7 @@ pub mod autoupdate;
 pub mod config;
 pub mod dispatch;
 pub mod edf;
+pub mod iodata;
 pub mod jobarg;
 pub mod jobenv;
 pub mod log;
@@ -33,6 +34,11 @@ use crate::edf::{local_load_edf, modify_edf_for_sbatch, remote_load_edf};
 use crate::log::{setup_tracing};
 use crate::config::{load_config, render_user_job_config, setup_imagestore};
 use crate::dispatch::dispatch_execution;
+use crate::iodata::{
+    DataContainer,
+    get_iodata_from_stdin,
+    send_iodata_to_stdout,
+};
 use crate::jobarg::load_jobarg;
 use crate::jobenv::load_jobenv;
 use crate::podman::{PODMAN_PIDFILE_NAME, podman_get_pid_from_file, podman_pull, podman_start};
@@ -283,7 +289,7 @@ pub(crate) fn setup_folders(
 pub(crate) fn get_local_task_id(state: &State) -> u32 {
     return state.job.clone().unwrap().local_task_id;
 }
-
+/*
 pub(crate) fn send_output(state: &State) {
     let json_string = match serde_json::to_string(state) {
         Ok(s) => s,
@@ -294,6 +300,7 @@ pub(crate) fn send_output(state: &State) {
     println!("{json_string}");
     let _ = io::stdout().flush();
 }
+*/
 
 pub(crate) fn console_output(msg: &str) {
     let console_out = ConsoleOutput {

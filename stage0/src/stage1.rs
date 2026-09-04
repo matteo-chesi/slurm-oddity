@@ -3,7 +3,7 @@ use std::error::Error;
 use std::ffi::OsStr;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::{Command, Output, Stdio};
+use std::process::{Command, Stdio};
 use std::io::{BufRead, BufReader, Read, Write};
 //use std::process::Stdio;
 //use tokio::runtime::Runtime;
@@ -12,10 +12,11 @@ use std::io::{BufRead, BufReader, Read, Write};
 use users::get_current_uid;
 use tracing::{info};
 
-use slurm_spank::{Context, SpankHandle, spank_log_user};
+use slurm_spank::{SpankHandle, spank_log_user};
 
 use crate::{ConsoleOutput, IOData, SpankStage0, set_local2remote_env_var, spank_getenv};
 
+/*
 pub(crate) fn run_stage1(
     stage0: &mut SpankStage0,
     spank: &mut SpankHandle,
@@ -412,11 +413,12 @@ pub(crate) fn remote_run_stage1_new(
             info!("stderr: {}", line);
         }
     };
-    
+
     let _ = set_current_dir(prev_dir);
 
     return Ok(msg_out);
 }
+*/
 
 fn set_job_home_env_var(spank: &mut SpankHandle) {
     let home_dir = spank_getenv(spank, "HOME");
@@ -428,8 +430,8 @@ fn set_job_home_env_var(spank: &mut SpankHandle) {
 }
 
 fn handle_stage1_stdout_msg(
-    stage0: &mut SpankStage0,
-    spank: &mut SpankHandle,
+    _stage0: &mut SpankStage0,
+    _spank: &mut SpankHandle,
     msg: &str)
 {
     let console_out: Option<ConsoleOutput> = match serde_json::from_str(msg) {
@@ -543,11 +545,13 @@ pub(crate) fn run_stage1_new2(
 
     info!("Executing: {}", &cmdstr);
 
-    let input_json = serde_json::to_vec(&data)?; 
+    let input_json = serde_json::to_string(&data)?; 
+    info!("{}", &input_json);
+    let (reader, mut writer) = std::io::pipe()?;
 
     let mut child = match Command::new(cmdname)
         .args(cmdargs)
-        .stdin(Stdio::piped())
+        .stdin(reader)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn() {
@@ -556,9 +560,10 @@ pub(crate) fn run_stage1_new2(
             return Err("failed to spawn command".into());
         },
     };
-
-    let mut child_stdin = child.stdin.take().unwrap();
-    child_stdin.write_all(&input_json)?;
+    //let msg = input_json.as_bytes().to_vec();
+    let msg = format!("{input_json}\n").as_bytes().to_vec();
+    writer.write_all(&msg)?;
+    writer.flush()?;
 
     let stdout = match child.stdout.take() {
         Some(out) => out,

@@ -7,22 +7,26 @@ use tracing::{Level, info};
 
 use crate::{
     APP_NAME,
+    //IOData,
     ErrorDestination,
     SpankStage0,
     error_destination,
     format_error_chain,
     get_iodata,
+    get_iodata_from_str,
     init_log_file,
-    run_stage1,
+    //run_stage1,
     run_stage1_new2,
-    remote_run_stage1_new,
+    //remote_run_stage1_new,
     set_panic_hook,
+    update_iodata,
 };
 use crate::args::*;
 use crate::config::{dispatch_load_config};
 use crate::state::{dispatch_load_state};
 use crate::containers::{
-    container_join_from_stage1_output,
+    //container_join_from_stage1_output,
+    container_join_from_iodata,
 };
 
 macro_rules! log_init {
@@ -66,6 +70,25 @@ unsafe impl Plugin for SpankStage0 {
 
         //let _ = run_stage1(self, spank, context, function, payload);
         let output = run_stage1_new2(self, spank, &mut io_data)?;
+        self.iodata = get_iodata_from_str(&output)?;
+        /*
+        let json: serde_json::Value = match serde_json::from_str(&output) {
+            Ok(j) => j,
+            Err(e) => {
+                error!("Error: cannot deserialize stage1 output");
+                return Err(e.into());
+            },
+        };
+        info!("OUTPUT:\n{}", serde_json::to_string_pretty(&json)?);
+        let iodata: IOData = match serde_json::from_value(json) {
+            Ok(j) => j,
+            Err(e) => {
+                info!("ERROR: {e}");
+                return Ok(());
+            },
+        };
+        self.iodata = Some(iodata);
+        */
 
         Ok(())
     }
@@ -97,7 +120,17 @@ unsafe impl Plugin for SpankStage0 {
 
         load_plugin_args(self, spank)?;
         let payload = self.args.payload.clone();
-        let _ = run_stage1(self, spank, context, function, payload);
+        update_iodata(self, spank, context.clone(), function.clone(), payload.clone())?;
+        info!("IODATA:\n{}", serde_json::to_string_pretty(&self.iodata)?);
+        
+        if function != self.iodata.clone().unwrap().exchange.stage1_next_function {
+            return Ok(());
+        }
+
+        //let _ = run_stage1(self, spank, context, function, payload);
+        let mut io_data = self.iodata.clone().unwrap();
+        let output = run_stage1_new2(self, spank, &mut io_data)?;
+        self.iodata = get_iodata_from_str(&output)?;
 
         Ok(())
     }
@@ -111,9 +144,18 @@ unsafe impl Plugin for SpankStage0 {
         let context  = String::from("remote");
         let function = String::from("user_init");
         let payload = self.args.payload.clone();
+        update_iodata(self, spank, context.clone(), function.clone(), payload.clone())?;
+
+        if function != self.iodata.clone().unwrap().exchange.stage1_next_function {
+            return Ok(());
+        }
 
         //slurmstepd_user_init(self, spank)
-        let _ = run_stage1(self, spank, context, function, payload);
+        //let _ = run_stage1(self, spank, context, function, payload);
+        let mut io_data = self.iodata.clone().unwrap();
+        let output = run_stage1_new2(self, spank, &mut io_data)?;
+        self.iodata = get_iodata_from_str(&output)?;
+        
         Ok(())
     }
 
@@ -126,11 +168,22 @@ unsafe impl Plugin for SpankStage0 {
         let context  = String::from("remote");
         let function = String::from("task_init");
         let payload = self.args.payload.clone();
+
+        update_iodata(self, spank, context.clone(), function.clone(), payload.clone())?;
+
+        if function != self.iodata.clone().unwrap().exchange.stage1_next_function {
+            return Ok(());
+        }
         
         dispatch_load_state(self, spank)?;
 
-        let output = remote_run_stage1_new(self, spank, context, function, payload)?;
-        container_join_from_stage1_output(self, spank, output)?;
+        let mut io_data = self.iodata.clone().unwrap();
+        //let output = remote_run_stage1_new(self, spank, context, function, payload)?;
+        let output = run_stage1_new2(self, spank, &mut io_data)?;
+        self.iodata = get_iodata_from_str(&output)?;
+        info!("IODATA:\n{:#?}", self.iodata);
+        //container_join_from_stage1_output(self, spank, output)?;
+        container_join_from_iodata(self, spank)?;
 
         Ok(())
     }
@@ -163,6 +216,15 @@ unsafe impl Plugin for SpankStage0 {
             }
             _ => { return Ok(()); }
         }
+        update_iodata(self, spank, context.clone(), function.clone(), payload.clone())?;
+
+        if function != self.iodata.clone().unwrap().exchange.stage1_next_function {
+            return Ok(());
+        }
+
+        let mut io_data = self.iodata.clone().unwrap();
+        let output = run_stage1_new2(self, spank, &mut io_data)?;
+        self.iodata = get_iodata_from_str(&output)?;
 
         //let _ = run_stage1(self, spank, context, function, payload);
         Ok(())
@@ -193,6 +255,15 @@ unsafe impl Plugin for SpankStage0 {
         let context  = String::from("remote");
         let function = String::from("task_exit");
         let payload = self.args.payload.clone();
+        update_iodata(self, spank, context.clone(), function.clone(), payload.clone())?;
+
+        if function != self.iodata.clone().unwrap().exchange.stage1_next_function {
+            return Ok(());
+        }
+
+        let mut io_data = self.iodata.clone().unwrap();
+        let output = run_stage1_new2(self, spank, &mut io_data)?;
+        self.iodata = get_iodata_from_str(&output)?;
 
         //slurmstepd_task_exit(self, spank)
         //let _ = run_stage1(self, spank, context, function, payload);
@@ -216,8 +287,17 @@ unsafe impl Plugin for SpankStage0 {
             }
             _ => { return Ok(()); }
         }
+        update_iodata(self, spank, context.clone(), function.clone(), payload.clone())?;
 
-        let _ = run_stage1(self, spank, context, function, payload);
+        if function != self.iodata.clone().unwrap().exchange.stage1_next_function {
+            return Ok(());
+        }
+
+        //let _ = run_stage1(self, spank, context, function, payload);
+        let mut io_data = self.iodata.clone().unwrap();
+        let output = run_stage1_new2(self, spank, &mut io_data)?;
+        self.iodata = get_iodata_from_str(&output)?;
+
         Ok(())
     }
 

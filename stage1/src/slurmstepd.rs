@@ -3,32 +3,96 @@ use std::env::{VarError, remove_var, var};
 use std::{thread, time::Duration};
 use nix::unistd::{getegid, geteuid};
 use users::{get_current_uid, get_current_gid};
-use tracing::{info};
+use tracing::{error, info};
 
-use crate::{NAME,
+use crate::{
+    NAME,
     SLURM_BATCH_SCRIPT,
+    DataContainer,
     Job,
     Run,
     State,
     console_output,
+    get_iodata_from_stdin,
     modify_edf_for_sbatch,
     podman_get_pid_from_file,
     remote_load_edf,
     render_user_job_config,
-    send_output,
+    send_iodata_to_stdout,
     setup_folders,
     sync_podman_pull,
     sync_podman_start,
 };
 
+pub(crate) fn slurmstepd_init(_state: &mut State) {
+
+    let mut data = match get_iodata_from_stdin() {
+        Ok(d) => d,
+        Err(e) => {
+            error!("Error: cannot read input data: {e}");
+            return;
+        },
+    };
+
+    info!("INPUT:\n{:#?}", data);
+
+    data.exchange.stage1_next_function = String::from("init_post_opt");
+
+    info!("OUTPUT:\n{:#?}", data);
+
+    match send_iodata_to_stdout(&data) {
+        Ok(_) => {},
+        Err(e) => {
+            error!("Error: cannot send output data: {e}");
+            return;
+        },
+    };
+}
+
 pub(crate) fn slurmstepd_init_post_opt(state: &mut State) {
+    
+    let mut data = match get_iodata_from_stdin() {
+        Ok(d) => d,
+        Err(e) => {
+            error!("Error: cannot read input data: {e}");
+            return;
+        },
+    };
+
+    info!("INPUT:\n{:#?}", data);
+    
+    data.exchange.stage1_next_function = String::from("task_init");
+
+    info!("OUTPUT:\n{:#?}", data);
+
     remote_load_edf(state);
     let _ = job_get_info(state);
     info!("JOB_INFO:\n{:#?}", state.job);
     let _ = remote_unset_env_vars(state);
+    
+    match send_iodata_to_stdout(&data) {
+        Ok(_) => {},
+        Err(e) => {
+            error!("Error: cannot send output data: {e}");
+            return;
+        },
+    };
 }
 
 pub(crate) fn slurmstepd_task_init(state: &mut State) {
+    info!("OK TASK INIT");
+    let mut data = match get_iodata_from_stdin() {
+        Ok(d) => d,
+        Err(e) => {
+            error!("Error: cannot read input data: {e}");
+            return;
+        },
+    };
+
+    info!("INPUT:\n{:#?}", data);
+    
+    data.exchange.stage1_next_function = String::from("end");
+
     remote_load_edf(state);
     let _ = job_get_info(state);
     let _ = run_get_info(state);
@@ -52,7 +116,33 @@ pub(crate) fn slurmstepd_task_init(state: &mut State) {
     info!("YEAH!!");
     let _ = sync_podman_start(state);
     info!("STAKAZZO");
-    send_output(state);
+
+    let pid: u32 = match state.run.clone().unwrap().pid.try_into() {
+        Ok(p) => p,
+        Err(_) => {
+            error!("Error: convert pid in u32");
+            return;
+        },
+    };
+    
+    let dc = DataContainer {
+        env: state.edf.clone().unwrap().env,
+        pid: pid,
+        workdir: state.edf.clone().unwrap().workdir,
+    };
+    data.exchange.container = Some(dc);
+
+    info!("OUTPUT:\n{:#?}", data);
+
+    //send_output(state);
+    
+    match send_iodata_to_stdout(&data) {
+        Ok(_) => {},
+        Err(e) => {
+            error!("Error: cannot send output data: {e}");
+            return;
+        },
+    }
 }
 
 pub(crate) fn remote_unset_env_vars(state: &mut State) -> Result<(), Box<dyn Error>> {

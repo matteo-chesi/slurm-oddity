@@ -4,7 +4,7 @@ use std::error::Error;
 
 use crate::{PLUGIN_NAME, SpankStage0};
 
-#[derive(Default, Serialize, Deserialize, Debug)]
+#[derive(Clone, Default, Serialize, Deserialize, Debug)]
 pub(crate) struct Stage0Args {
     pub(crate) payload: Option<String>,
 }
