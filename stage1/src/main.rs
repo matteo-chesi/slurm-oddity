@@ -57,7 +57,7 @@ use crate::sync::{
     sync_cleanup_fs_shared,
 };
 
-pub(crate) const COLOR: &str = "GREEN";
+pub(crate) const COLOR: &str = "BLUE";
 pub(crate) const NAME: &str = "slurm-oddity";
 pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub(crate) const COMMAND_NAME: &str = "stage1";
