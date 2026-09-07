@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::Path;
-use crate::{get_cache_dir_path};
+use crate::{IOData, get_cache_dir_path};
 
 pub(crate) fn load_jobenv() -> HashMap<String, String> {
     let jobenv = match cache2jobenv() {
@@ -35,4 +35,10 @@ fn cache2jobenv() -> Result<HashMap<String, String>, String> {
         },
     };
     Ok(h)
+}
+
+pub(crate) fn load_jobenv_from_data(data: &mut IOData) -> HashMap<String,String> {
+
+    let job_env = data.exchange.job_env.clone();
+    job_env
 }

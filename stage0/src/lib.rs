@@ -9,7 +9,15 @@ use serde::{Serialize, Deserialize};
 use slurm_spank::{Plugin, SLURM_VERSION_NUMBER, SPANK_PLUGIN, SpankHandle};
 use crate::args::{Stage0Args, get_args};
 use crate::config::{Stage0Config, load_config};
-use crate::iodata::{IOData, get_iodata, get_iodata_from_str, update_iodata};
+use crate::iodata::{
+    IOData,
+    get_iodata,
+    get_iodata_from_str,
+    get_job_arg,
+    get_job_env,
+    update_iodata,
+    set_local2remote_env_var_from_iodata
+};
 use crate::state::Stage0State;
 
 pub(crate) use crate::log::{
@@ -22,7 +30,7 @@ pub(crate) use crate::log::{
     set_panic_hook,
 };
 pub(crate) use crate::stage1::{run_stage1_new2};
-pub(crate) use crate::state::{set_local2remote_env_var, get_job_env};
+pub(crate) use crate::state::{set_local2remote_env_var};
 
 pub mod args;
 pub mod config;

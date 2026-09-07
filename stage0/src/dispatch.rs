@@ -19,6 +19,7 @@ use crate::{
     run_stage1_new2,
     //remote_run_stage1_new,
     set_panic_hook,
+    set_local2remote_env_var_from_iodata,
     update_iodata,
 };
 use crate::args::*;
@@ -71,6 +72,8 @@ unsafe impl Plugin for SpankStage0 {
         //let _ = run_stage1(self, spank, context, function, payload);
         let output = run_stage1_new2(self, spank, &mut io_data)?;
         self.iodata = get_iodata_from_str(&output)?;
+        set_local2remote_env_var_from_iodata(&mut self.iodata);
+        
         /*
         let json: serde_json::Value = match serde_json::from_str(&output) {
             Ok(j) => j,
@@ -123,7 +126,7 @@ unsafe impl Plugin for SpankStage0 {
         update_iodata(self, spank, context.clone(), function.clone(), payload.clone())?;
         info!("IODATA:\n{}", serde_json::to_string_pretty(&self.iodata)?);
         
-        if function != self.iodata.clone().unwrap().exchange.stage1_next_function {
+        if ! self.iodata.clone().unwrap().exchange.stage1_function_set.contains(&function) {
             return Ok(());
         }
 
@@ -131,6 +134,7 @@ unsafe impl Plugin for SpankStage0 {
         let mut io_data = self.iodata.clone().unwrap();
         let output = run_stage1_new2(self, spank, &mut io_data)?;
         self.iodata = get_iodata_from_str(&output)?;
+        set_local2remote_env_var_from_iodata(&mut self.iodata);
 
         Ok(())
     }
@@ -146,7 +150,7 @@ unsafe impl Plugin for SpankStage0 {
         let payload = self.args.payload.clone();
         update_iodata(self, spank, context.clone(), function.clone(), payload.clone())?;
 
-        if function != self.iodata.clone().unwrap().exchange.stage1_next_function {
+        if ! self.iodata.clone().unwrap().exchange.stage1_function_set.contains(&function) {
             return Ok(());
         }
 
@@ -171,7 +175,7 @@ unsafe impl Plugin for SpankStage0 {
 
         update_iodata(self, spank, context.clone(), function.clone(), payload.clone())?;
 
-        if function != self.iodata.clone().unwrap().exchange.stage1_next_function {
+        if ! self.iodata.clone().unwrap().exchange.stage1_function_set.contains(&function) {
             return Ok(());
         }
         
@@ -184,6 +188,7 @@ unsafe impl Plugin for SpankStage0 {
         info!("IODATA:\n{:#?}", self.iodata);
         //container_join_from_stage1_output(self, spank, output)?;
         container_join_from_iodata(self, spank)?;
+        
 
         Ok(())
     }
@@ -218,7 +223,7 @@ unsafe impl Plugin for SpankStage0 {
         }
         update_iodata(self, spank, context.clone(), function.clone(), payload.clone())?;
 
-        if function != self.iodata.clone().unwrap().exchange.stage1_next_function {
+        if ! self.iodata.clone().unwrap().exchange.stage1_function_set.contains(&function) {
             return Ok(());
         }
 
@@ -251,13 +256,15 @@ unsafe impl Plugin for SpankStage0 {
         //if !self.config.skybox_enabled {
         //    return Ok(());
         //}
+        info!("TASK_EXIT");
         
         let context  = String::from("remote");
         let function = String::from("task_exit");
         let payload = self.args.payload.clone();
         update_iodata(self, spank, context.clone(), function.clone(), payload.clone())?;
+        info!("IODATA:\n{:#?}", self.iodata);
 
-        if function != self.iodata.clone().unwrap().exchange.stage1_next_function {
+        if ! self.iodata.clone().unwrap().exchange.stage1_function_set.contains(&function) {
             return Ok(());
         }
 
@@ -289,7 +296,7 @@ unsafe impl Plugin for SpankStage0 {
         }
         update_iodata(self, spank, context.clone(), function.clone(), payload.clone())?;
 
-        if function != self.iodata.clone().unwrap().exchange.stage1_next_function {
+        if ! self.iodata.clone().unwrap().exchange.stage1_function_set.contains(&function) {
             return Ok(());
         }
 

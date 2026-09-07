@@ -2,6 +2,7 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::fs::read_to_string;
 use std::time::Instant;
+use sysinfo::{Pid, System};
 use tracing::{info};
 
 use sarus_suite_podman_driver::{self as pmd, ContainerCtx, PodmanCtx};
@@ -9,6 +10,21 @@ use sarus_suite_podman_driver::{self as pmd, ContainerCtx, PodmanCtx};
 use crate::{State, setup_imagestore};
 
 pub(crate) const PODMAN_PIDFILE_NAME: &str = "pidfile";
+
+fn process_exists(pid: usize) -> bool {
+    let p = Pid::from(pid);
+
+    let s = System::new_all();
+    let ret = match s.process(p) {
+        None => false,
+        Some(process) => {
+            let state = process.status();
+            info!("process {pid} status is {state}");
+            true
+        }
+    };
+    ret
+}
 
 pub(crate) fn podman_get_pid_from_file(state: &mut State) -> Result<usize, Box<dyn Error>> {
     let run = match &state.run {
@@ -268,5 +284,56 @@ where
     info!("PODMAN RUN RESULT {:#?}", result);
     result?;
     info!("PODMAN RUN END");
+    Ok(())
+}
+
+pub(crate) fn podman_stop(
+    state: &mut State,
+) -> Result<(), Box<dyn Error>> {
+
+    let run = match &state.run {
+        Some(o) => o,
+        None => {
+            return Err("couldn't find run".into());
+        }
+    };
+
+    let pid = run.pid;
+    if pid == usize::MAX {
+        info!("Couldn't find container PID to stop.");
+        return Err("Couldn't find container PID to stop.".into());
+    }
+    
+
+    /*
+    let pid = match podman_get_pid_from_file(state) {
+        Ok(pid) => pid,
+        Err(_) => {
+            info!("Couldn't find container PID to stop.");
+            return Err("Couldn't find container PID to stop.".into());
+        },
+    };
+    */
+
+    info!("stopping container, process {pid}");
+    let mut kill = std::process::Command::new("kill")
+        .args(["-s", "SIGCONT", &pid.to_string()])
+        .spawn()?;
+    kill.wait()?;
+
+    if process_exists(pid) {
+        info!("process {pid} is still there, waiting one more second.");
+        let pause = std::time::Duration::from_secs(1);
+        std::thread::sleep(pause);
+    }
+
+    if process_exists(pid) {
+        info!("process {pid} is still there, terminating it.");
+        let mut kill = std::process::Command::new("kill")
+            .args(["-s", "SIGTERM", &pid.to_string()])
+            .spawn()?;
+        kill.wait()?;
+    }
+
     Ok(())
 }

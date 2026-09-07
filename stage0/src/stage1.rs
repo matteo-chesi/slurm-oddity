@@ -618,10 +618,12 @@ pub(crate) fn run_stage1_new2(
 
     let _ = set_current_dir(prev_dir);
 
+    /*
     if ( context == "local" || context == "allocator" ) &&
         function == "init_post_opt" {
             set_local2remote_env_var(stage0);
     }
+    */
 
     return Ok(msg_out);
 }

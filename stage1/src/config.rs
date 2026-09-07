@@ -2,15 +2,15 @@ use std::env;
 use std::error::Error;
 use std::collections::HashMap;
 use std::ffi::{OsString};
-use std::fs::File;
-use std::fs::{read_to_string};
-use std::io::Write;
+//use std::fs::File;
+//use std::fs::{read_to_string};
+//use std::io::Write;
 use std::path::Path;
 use std::time::Duration;
 use serde_json::{map::Entry, Value};
 use url::Url;
 use users::{get_current_groupname};
-use regex::Regex;
+//use regex::Regex;
 use tracing::{info};
 
 use raster::{Config,
@@ -20,9 +20,45 @@ use raster::{Config,
     hook_run,
     update_config_by_user,
     load_config as raster_load_config};
-use crate::{AutoUpdate, State, auto_update, create_dir_path, get_cache_dir_path};
+use crate::{
+    AutoUpdate,
+    DataForward,
+    IOData,
+    State,
+    auto_update,
+    //create_dir_path,
+    //get_cache_dir_path,
+};
 
+pub(crate) fn load_config(data: &mut IOData) -> Config {
+    
+    if data.forward.is_none() {
+        let config = match raster_load_config() {
+            Ok(cfg) => cfg,
+            Err(_) => {
+                panic!("Cannot load configuration");
+            },
+        };
+        data.forward = Some(
+            DataForward {
+                config: config,
+            }
+        );
+    }
+
+    let mut config = data.forward.clone().unwrap().config;
+
+    config = load_config_from_launch_control(&config);
+    data.forward = Some(
+        DataForward {
+            config: config.clone(),
+        }
+    );
+    config
+}
+/*
 pub(crate) fn load_config() -> Config {
+
     //print_home();
     let mut config = match cache2config() {
         Ok(cfg) => {
@@ -42,7 +78,8 @@ pub(crate) fn load_config() -> Config {
     config2cache(&config);
     config
 }
-
+*/
+/*
 fn config2cache(config: &Config) {
 
     let cache_dir_path = get_cache_dir_path();
@@ -71,7 +108,8 @@ fn config2cache(config: &Config) {
         }
     };
 }
-
+*/
+/*
 fn cache2config() -> Result<Config, String> {
     let cache_dir_path = get_cache_dir_path();
     let mut config_cache_file_path = format!("{cache_dir_path}/config.json");
@@ -103,7 +141,7 @@ fn cache2config() -> Result<Config, String> {
     };
     Ok(config)
 }
-
+*/
 fn load_config_from_launch_control(old_config: &Config) -> Config {
     let mut config = old_config.clone();
 

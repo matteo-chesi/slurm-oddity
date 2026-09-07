@@ -11,7 +11,7 @@ use const_format::formatcp;
 use nix::libc::{gid_t, uid_t};
 use clap::{Parser, ValueEnum};
 use serde::{Serialize};
-use tracing::{info};
+use tracing::{error, info};
 use whoami::username;
 
 pub mod autoupdate;
@@ -35,15 +35,29 @@ use crate::log::{setup_tracing};
 use crate::config::{load_config, render_user_job_config, setup_imagestore};
 use crate::dispatch::dispatch_execution;
 use crate::iodata::{
+    IOData,
     DataContainer,
+    DataForward,
     get_iodata_from_stdin,
     send_iodata_to_stdout,
 };
-use crate::jobarg::load_jobarg;
-use crate::jobenv::load_jobenv;
-use crate::podman::{PODMAN_PIDFILE_NAME, podman_get_pid_from_file, podman_pull, podman_start};
-use crate::sync::{sync_podman_pull,sync_podman_start};
+use crate::jobarg::{load_jobarg, load_jobarg_from_data};
+use crate::jobenv::{load_jobenv, load_jobenv_from_data};
+use crate::podman::{
+    PODMAN_PIDFILE_NAME,
+    podman_get_pid_from_file,
+    podman_pull,
+    podman_start,
+    podman_stop,
+};
+use crate::sync::{
+    sync_podman_pull,
+    sync_podman_start,
+    sync_podman_stop,
+    sync_cleanup_fs_shared,
+};
 
+pub(crate) const COLOR: &str = "GREEN";
 pub(crate) const NAME: &str = "slurm-oddity";
 pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub(crate) const COMMAND_NAME: &str = "stage1";
@@ -137,7 +151,21 @@ pub(crate) struct ConsoleOutput {
 }
 
 fn run(args: &Args) {
-    let mut state = load_state(args);
+    
+    let mut data = match get_iodata_from_stdin() {
+        Ok(d) => d,
+        Err(e) => {
+            error!("Error: cannot read input data: {e}");
+            return;
+        },
+    };
+    let config = load_config(&mut data);
+    let job_arg = load_jobarg_from_data(&mut data);
+    let job_env = load_jobenv_from_data(&mut data);
+
+    //info!("INPUT:\n{:#?}", data);
+
+    let mut state = load_state(args, &config, &job_arg, &job_env);
     // Start Tracing
     let span = tracing::span!(tracing::Level::INFO, APP_NAME);
     let _ = span.enter();
@@ -152,7 +180,7 @@ fn run(args: &Args) {
     }
 
     log_start(&state);
-    dispatch_execution(&mut state);
+    dispatch_execution(&mut state, &mut data);
     log_end(&state);
 }
 
@@ -161,8 +189,16 @@ fn main() {
     run(&args);
 }
 
-pub(crate) fn load_state(args: &Args) -> State {
+pub(crate) fn load_state(
+    args: &Args,
+    config: &Config,
+    job_arg: &Vec<String>,
+    job_env: &HashMap<String, String>,
+) -> State {
     let state_args = args.clone();
+    let state_config = config.clone();
+    let state_job_arg = job_arg.clone();
+    let state_job_env = job_env.clone();
 
     let exe_user = username().unwrap_or(String::from("unknown_user"));
     
@@ -179,9 +215,11 @@ pub(crate) fn load_state(args: &Args) -> State {
         exe_path: exe_path,
         exe_args: exe_args,
         args: state_args,
-        job_env: load_jobenv(),
-        job_arg: load_jobarg(),
-        config: load_config(),
+        job_arg: state_job_arg,
+        job_env: state_job_env,
+        //job_arg: load_jobarg(),
+        //job_env: load_jobenv(),
+        config: state_config,
         edf: None,
         job: None,
         run: None,
@@ -317,3 +355,31 @@ pub(crate) fn console_output(msg: &str) {
     println!("{console_out_json}");
 }
 
+pub(crate) fn cleanup_fs_local(
+    state: &mut State,
+) -> Result<(), Box<dyn Error>> {
+    
+    let base_path = match &state.run {
+        Some(r) => &r.podman_tmp_path,
+        None => {
+            return Err("couldn't find run".into());
+        }
+    };
+
+    while !Path::new(&base_path).exists() {
+        info!("couldn't find {}, wait 1 sec and retry", &base_path);
+
+        let pause = std::time::Duration::new(1, 0);
+        std::thread::sleep(pause);
+    }
+
+    info!("delete {}", &base_path);
+    match std::fs::remove_dir_all(&base_path) {
+        Ok(_) => (),
+        Err(e) => {
+            let msg = format!("couldn't cleanup \"{:#?}\", error {}", &base_path, e);
+            return Err(msg.into());
+        }
+    };
+    Ok(())
+}

@@ -13,7 +13,17 @@ use tracing::{info};
 use slurm_spank::{Context, SpankHandle};
 use raster::{expand_vars_string};
 
-use crate::{CACHE_PATH, LOCAL2REMOTE_VARNAME, LOCAL2REMOTE_FILENAME, create_dir_path, SpankStage0, get_log_dirpath, spank_getenv};
+use crate::{
+    CACHE_PATH,
+    LOCAL2REMOTE_VARNAME,
+    LOCAL2REMOTE_FILENAME,
+    create_dir_path,
+    SpankStage0,
+    get_job_arg,
+    get_job_env,
+    get_log_dirpath,
+    spank_getenv
+};
 
 #[derive(Serialize, Deserialize)]
 pub(crate) struct Stage0State {
@@ -289,9 +299,9 @@ pub(crate) fn remote_load_state(
     plugin.state.job_env = hm.clone();
     
     // Write input.json
-    jobarg2cache(plugin, spank); 
-    jobenv2cache(plugin, spank); 
-    info!("AMMAZZI");
+    //jobarg2cache(plugin, spank); 
+    //jobenv2cache(plugin, spank); 
+    //info!("AMMAZZI");
     
     let mut i = 0;
     for a in vc.clone() {
@@ -305,7 +315,7 @@ pub(crate) fn remote_load_state(
 
     Ok(())
 }
-
+/*
 pub(crate) fn get_job_arg(spank: &mut SpankHandle) -> Vec<String> {
     let vec = match spank.job_argv() {
         Ok(v) => v,
@@ -346,7 +356,7 @@ pub(crate) fn get_job_env(spank: &mut SpankHandle) -> HashMap<String,String> {
 
     return h;
 }
-
+*/
 pub(crate) fn get_cache_dir_path(plugin: &mut SpankStage0) -> String {
     let jobenv = plugin.state.job_env.clone();
     let opt_jobenv;

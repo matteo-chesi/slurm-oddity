@@ -2,11 +2,19 @@ use std::env::var;
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
+use std::path::Path;
 use tracing::{info};
 use raster::{EDF, render, mount::SarusMount};
-use crate::{SLURM_BATCH_SCRIPT, LOCAL2REMOTE_VARNAME, State, get_cache_dir_path};
+use crate::{
+    SLURM_BATCH_SCRIPT,
+    LOCAL2REMOTE_VARNAME,
+    IOData,
+    State,
+    create_dir_path,
+    get_cache_dir_path,
+};
 
-pub(crate) fn local_load_edf(state: &mut State) {
+pub(crate) fn local_load_edf(state: &mut State, data: &mut IOData) {
     let edf_name = match &state.args.payload {
         Some(name) => String::from(name),
         None => {
@@ -24,7 +32,8 @@ pub(crate) fn local_load_edf(state: &mut State) {
     };
 
     //edf2cache(&edf);
-    add_edf_to_local2remote_data_file(&edf);
+    //add_edf_to_local2remote_data_file(&edf);
+    add_edf_to_local2remote_iodata(&edf, data);
     state.edf = Some(edf);
 }
 
@@ -44,6 +53,8 @@ pub(crate) fn remote_load_edf(state: &mut State) {
 fn add_edf_to_local2remote_data_file(edf: &EDF) {
     
     let cache_dir_path = get_cache_dir_path();
+    let _ = create_dir_path(Path::new(&cache_dir_path), 0o700);
+
     let l2r_data_file_path = format!("{cache_dir_path}/local2remote_data.json");
 
     let edf_content = match serde_json::to_string(&edf) {
@@ -70,6 +81,19 @@ fn add_edf_to_local2remote_data_file(edf: &EDF) {
     let _ = file.sync_all();
 }
 
+
+fn add_edf_to_local2remote_iodata(edf: &EDF, data: &mut IOData) {
+   
+    let edf_content = match serde_json::to_string(&edf) {
+        Ok(s) => s,
+        Err(_) => {
+            panic!("Cannot serialize EDF to json");
+        }
+    };
+
+    data.exchange.local2remote = edf_content;
+}
+
 fn get_edf_from_local2remote_data_env() -> Result<EDF, String> {
     let l2r_str = match var(LOCAL2REMOTE_VARNAME) {
         Ok(s) => s,
@@ -78,6 +102,7 @@ fn get_edf_from_local2remote_data_env() -> Result<EDF, String> {
             return Err(format!("cannot read {LOCAL2REMOTE_VARNAME} environment variable"));
             },
     };
+    info!("{}={}", LOCAL2REMOTE_VARNAME, l2r_str);
     
     let edf: EDF = match serde_json::from_str(&l2r_str) {
         Ok(f) => f,

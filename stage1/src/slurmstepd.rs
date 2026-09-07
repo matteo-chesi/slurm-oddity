@@ -6,14 +6,17 @@ use users::{get_current_uid, get_current_gid};
 use tracing::{error, info};
 
 use crate::{
+    COLOR,
+    IOData,
     NAME,
     SLURM_BATCH_SCRIPT,
     DataContainer,
     Job,
     Run,
     State,
+    cleanup_fs_local,
     console_output,
-    get_iodata_from_stdin,
+    //get_iodata_from_stdin,
     modify_edf_for_sbatch,
     podman_get_pid_from_file,
     remote_load_edf,
@@ -22,10 +25,13 @@ use crate::{
     setup_folders,
     sync_podman_pull,
     sync_podman_start,
+    sync_podman_stop,
+    sync_cleanup_fs_shared,
 };
 
-pub(crate) fn slurmstepd_init(_state: &mut State) {
+pub(crate) fn slurmstepd_init(_state: &mut State, data: &mut IOData) {
 
+    /*
     let mut data = match get_iodata_from_stdin() {
         Ok(d) => d,
         Err(e) => {
@@ -33,10 +39,17 @@ pub(crate) fn slurmstepd_init(_state: &mut State) {
             return;
         },
     };
+    */
 
     info!("INPUT:\n{:#?}", data);
 
-    data.exchange.stage1_next_function = String::from("init_post_opt");
+    data.exchange.stage1_function_set = vec![
+        "init".to_string(),
+        "init_post_opt".to_string(),
+        "task_init".to_string(),
+        "task_exit".to_string(),
+        "exit".to_string(),
+    ];
 
     info!("OUTPUT:\n{:#?}", data);
 
@@ -49,8 +62,9 @@ pub(crate) fn slurmstepd_init(_state: &mut State) {
     };
 }
 
-pub(crate) fn slurmstepd_init_post_opt(state: &mut State) {
+pub(crate) fn slurmstepd_init_post_opt(state: &mut State, data: &mut IOData) {
     
+    /*
     let mut data = match get_iodata_from_stdin() {
         Ok(d) => d,
         Err(e) => {
@@ -58,11 +72,10 @@ pub(crate) fn slurmstepd_init_post_opt(state: &mut State) {
             return;
         },
     };
+    */
 
     info!("INPUT:\n{:#?}", data);
     
-    data.exchange.stage1_next_function = String::from("task_init");
-
     info!("OUTPUT:\n{:#?}", data);
 
     remote_load_edf(state);
@@ -79,7 +92,8 @@ pub(crate) fn slurmstepd_init_post_opt(state: &mut State) {
     };
 }
 
-pub(crate) fn slurmstepd_task_init(state: &mut State) {
+pub(crate) fn slurmstepd_task_init(state: &mut State, data: &mut IOData) {
+    /*
     info!("OK TASK INIT");
     let mut data = match get_iodata_from_stdin() {
         Ok(d) => d,
@@ -88,11 +102,10 @@ pub(crate) fn slurmstepd_task_init(state: &mut State) {
             return;
         },
     };
+    */
 
     info!("INPUT:\n{:#?}", data);
     
-    data.exchange.stage1_next_function = String::from("end");
-
     remote_load_edf(state);
     let _ = job_get_info(state);
     let _ = run_get_info(state);
@@ -102,16 +115,22 @@ pub(crate) fn slurmstepd_task_init(state: &mut State) {
     };
     let _ = setup_folders(state);
     let _ = modify_edf_for_sbatch(state);
+    
+
     info!("CONFIG:\n{:#?}", state.config);
     info!("RUN_INFO:\n{:#?}", state.run);
     info!("JOB_INFO:\n{:#?}", state.job);
-    info!("JOB_ARG:\n{:#?}", state.job_arg);
-    info!("JOB_ENV:\n{:#?}", state.job_env);
+    //info!("JOB_ARG:\n{:#?}", state.job_arg);
+    info!("JOB_ARG2:\n{:#?}", data.exchange.job_arg);
+    //info!("JOB_ENV:\n{:#?}", state.job_env);
+    info!("JOB_ENV2:\n{:#?}", data.exchange.job_env);
     info!("EDF_INFO:\n{:#?}", state.edf);
     info!("YUPPIE!");
-    console_output("YUPPIE!");
-    thread::sleep(Duration::from_millis(5000));
-    console_output("YEAH!!!");
+    
+    console_output(&format!("I am {} !\n", COLOR));
+    //thread::sleep(Duration::from_millis(5000));
+    //console_output("YEAH!!!");
+    
     let _ = sync_podman_pull(state);
     info!("YEAH!!");
     let _ = sync_podman_start(state);
@@ -136,6 +155,43 @@ pub(crate) fn slurmstepd_task_init(state: &mut State) {
 
     //send_output(state);
     
+    match send_iodata_to_stdout(&data) {
+        Ok(_) => {},
+        Err(e) => {
+            error!("Error: cannot send output data: {e}");
+            return;
+        },
+    }
+}
+
+pub(crate) fn slurmstepd_task_exit(state: &mut State, data: &mut IOData) {
+    //info!("INPUT:\n{:#?}", data);
+    
+    let _ = job_get_info(state);
+    let _ = run_get_info(state);
+    let _ = sync_podman_stop(state);
+
+    //info!("OUTPUT:\n{:#?}", data);
+
+    match send_iodata_to_stdout(&data) {
+        Ok(_) => {},
+        Err(e) => {
+            error!("Error: cannot send output data: {e}");
+            return;
+        },
+    }
+}
+
+pub(crate) fn slurmstepd_exit(state: &mut State, data: &mut IOData) {
+    //info!("INPUT:\n{:#?}", data);
+    
+    let _ = job_get_info(state);
+    let _ = run_get_info(state);
+    let _ = cleanup_fs_local(state);
+    let _ = sync_cleanup_fs_shared(state);
+
+    //info!("OUTPUT:\n{:#?}", data);
+
     match send_iodata_to_stdout(&data) {
         Ok(_) => {},
         Err(e) => {
@@ -250,19 +306,21 @@ pub(crate) fn run_get_info(state: &mut State) -> Result<(), Box<dyn Error>> {
     let podman_tmp_path = format!("{}/{}", config.podman_tmp_path, name);
     let syncfile_path = format!("{}/.{}_import.done", config.parallax_imagestore, name);
 
-    let pid = match podman_get_pid_from_file(state) {
-        Ok(s) => s,
-        Err(_) => usize::MAX,
-    };
-
-    let run = Run {
+    let mut run = Run {
         name: name,
-        pid: pid,
+        pid: usize::MAX,
         podman_tmp_path: podman_tmp_path,
         syncfile_path: syncfile_path,
     };
 
-    state.run = Some(run);
+    state.run = Some(run.clone());
+
+    run.pid = match podman_get_pid_from_file(state) {
+        Ok(s) => s,
+        Err(_) => usize::MAX,
+    };
+    
+    state.run = Some(run.clone());
 
     Ok(())
 }
