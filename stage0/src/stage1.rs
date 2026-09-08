@@ -478,7 +478,8 @@ pub(crate) fn run_stage1_new2(
 
     let cmdname;
     let cmd2run;
-    let mut cmdargs = vec![];
+    //let mut cmdargs = vec![];
+    let mut cmdargs;
     let mut cmdstr;
     let username;
     let innercmd;

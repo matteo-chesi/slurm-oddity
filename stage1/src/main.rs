@@ -73,7 +73,7 @@ pub(crate) const SLURM_BATCH_SCRIPT: u32 = 0xfffffffb;
 
 #[derive(Serialize, Parser, Clone, Debug)]
 #[command(about = "\n
-Cosmodrome project stage1
+Slurm Oddity project stage1
 The command should be called by slurm spank plugin stage0
 The command should verify that all the calls works correctly and output is logged.", long_about = None)]
 #[command(version, about)]

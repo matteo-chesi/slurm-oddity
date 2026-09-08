@@ -7,7 +7,7 @@ use tracing::{info, error};
 
 use crate::{SpankStage0, spank_getenv};
 
-const CONFIGFILE_PATH: &str = "/etc/cosmodrome-stage0.conf";
+const CONFIGFILE_PATH: &str = "/etc/slurm-oddity-stage0.conf";
 
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct RawStage0Config {
@@ -24,7 +24,7 @@ pub struct Stage0Config {
 }
 
 fn get_default_stage1_user_path() -> String {
-    return String::from("$HOME/.local/share/cosmodrome/bin/stage1");
+    return String::from("$HOME/.local/share/slurm-oddity/bin/stage1");
 }
 
 fn get_default_stage1_system_path() -> String {

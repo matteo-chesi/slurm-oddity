@@ -43,7 +43,7 @@ pub(crate) fn log(arg: &str) {
 
 pub(crate) fn get_log_dirpath() -> String {
     let home_dir = home_dir().unwrap();
-    let log_dirpath = home_dir.join(std::path::PathBuf::from("cosmodrome"));
+    let log_dirpath = home_dir.join(std::path::PathBuf::from("slurm-oddity"));
     return log_dirpath.into_os_string().to_string_lossy().to_string();
 }
 

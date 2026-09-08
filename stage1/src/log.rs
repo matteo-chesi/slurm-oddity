@@ -97,7 +97,7 @@ pub(crate) fn get_log_dirpath() -> String {
         log_dirpath = std::path::PathBuf::from(variable.unwrap());
     } else {
         let home_dir = env::home_dir().unwrap();
-        log_dirpath = home_dir.join(std::path::PathBuf::from("cosmodrome"));
+        log_dirpath = home_dir.join(std::path::PathBuf::from("slurm-oddity"));
     }
     
     let hostname = gethostname()

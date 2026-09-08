@@ -3,7 +3,7 @@
 function help() {
   cat << EOF
 
-  Cosmpdrome project stage 1
+  Slurm Oddity project stage 1
   The script should be called but slurm spank plugin stage 0
   The script should verify that all the calls works correctly and output is logged.
 
@@ -106,7 +106,7 @@ if [ -n "${SLURM_STAGE0_LOGDIR}" ]
 then
   LOG_DIR="${SLURM_STAGE0_LOGDIR}/${NODENAME}" 
 else
-  LOG_DIR="${HOME}/cosmodrome/${NODENAME}" 
+  LOG_DIR="${HOME}/slurm-oddity/${NODENAME}" 
 fi
 
 LOG_FILE="${LOG_DIR}/stage1.log"

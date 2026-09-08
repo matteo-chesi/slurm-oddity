@@ -11,12 +11,12 @@ const_format = "0.2.36"
 gethostname = "1.1.0"
 iana-time-zone = "0.1.65"
 nix = { version = "0.31.3", features = ["user", "fs", "signal"] }
-raster = { path = "../../cosmodrome-raster" }
+raster = { path = "../../slurm-oddity-raster" }
 regex = "1.13.1"
 reqwest = { version = "0.13.4", features = ["blocking", "json"] }
 #sarus-suite-podman-driver = { git = "https://github.com/sarus-suite/podman-driver" }
 #sarus-suite-podman-driver = { git = "https://github.com/sarus-suite/cluster-tooling" }
-sarus-suite-podman-driver = { path = "../../cosmodrome-podman-driver" }
+sarus-suite-podman-driver = { path = "../../slurm-oddity-podman-driver" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 shellexpand = "3.1.2"
