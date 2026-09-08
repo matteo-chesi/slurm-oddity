@@ -1,23 +1,23 @@
 use std::collections::HashMap;
-use std::env::set_var;
+//use std::env::set_var;
 use std::error::Error;
 use std::ffi::OsStr;
-use std::fs::read_to_string;
-use std::fs::File;
-use std::io::Write;
-use std::path::Path;
+//use std::fs::read_to_string;
+//use std::fs::File;
+//use std::io::Write;
+//use std::path::Path;
 use gethostname::gethostname;
 use serde::{Deserialize, Serialize};
 use tracing::{info};
 
 use slurm_spank::{Context, SpankHandle};
-use raster::{expand_vars_string};
+//use raster::{expand_vars_string};
 
 use crate::{
-    CACHE_PATH,
+    //CACHE_PATH,
     LOCAL2REMOTE_VARNAME,
-    LOCAL2REMOTE_FILENAME,
-    create_dir_path,
+    //LOCAL2REMOTE_FILENAME,
+    //create_dir_path,
     SpankStage0,
     get_job_arg,
     get_job_env,
@@ -357,6 +357,7 @@ pub(crate) fn get_job_env(spank: &mut SpankHandle) -> HashMap<String,String> {
     return h;
 }
 */
+/*
 pub(crate) fn get_cache_dir_path(plugin: &mut SpankStage0) -> String {
     let jobenv = plugin.state.job_env.clone();
     let opt_jobenv;
@@ -380,7 +381,7 @@ pub(crate) fn get_cache_dir_path(plugin: &mut SpankStage0) -> String {
     let cache_dir_path = format!("{cache_path}/{cache_dirname}");
     return cache_dir_path;
 }
-
+*//*
 pub(crate) fn set_local2remote_env_var(plugin: &mut SpankStage0) {
     // Check file existence
     let cache_dir_path = get_cache_dir_path(plugin);
@@ -406,7 +407,7 @@ pub(crate) fn set_local2remote_env_var(plugin: &mut SpankStage0) {
     }
     info!("MORE THAN EVER");
 }
-
+*//*
 pub(crate) fn jobenv2cache(plugin: &mut SpankStage0, _spank: &mut SpankHandle) {
 
     info!("STIKKAZZI");
@@ -439,7 +440,7 @@ pub(crate) fn jobenv2cache(plugin: &mut SpankStage0, _spank: &mut SpankHandle) {
     let _ = file.sync_all();
     info!("BIGAZZI");
 }
-
+*//*
 pub(crate) fn jobarg2cache(plugin: &mut SpankStage0, _spank: &mut SpankHandle) {
 
     let cache_dir_path = get_cache_dir_path(plugin);
@@ -469,3 +470,4 @@ pub(crate) fn jobarg2cache(plugin: &mut SpankStage0, _spank: &mut SpankHandle) {
     let _ = file.flush();
     let _ = file.sync_all();
 }
+*/

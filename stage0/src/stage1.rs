@@ -14,7 +14,7 @@ use tracing::{info};
 
 use slurm_spank::{SpankHandle, spank_log_user};
 
-use crate::{ConsoleOutput, IOData, SpankStage0, set_local2remote_env_var, spank_getenv};
+use crate::{ConsoleOutput, IOData, SpankStage0, /*set_local2remote_env_var,*/ spank_getenv};
 
 /*
 pub(crate) fn run_stage1(

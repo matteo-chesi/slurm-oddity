@@ -1,21 +1,31 @@
 use std::path::Path;
 use std::fs::{self, File};
-use std::fs::read_to_string;
+//use std::fs::read_to_string;
 use std::io::{self};
-use std::io::Write;
+//use std::io::Write;
 use url::Url;
-use serde::{Deserialize, Serialize};
-use tracing::{info};
+//use serde::{Deserialize, Serialize};
+use tracing::{error, info};
 
-use crate::{CACHE_PATH, State, VERSION, expand_vars_string, create_dir_path, get_cache_dir_path};
+use crate::{
+    CACHE_PATH,
+    IOData,
+    DataAutoUpdate,
+    State, VERSION,
+    expand_vars_string,
+    create_dir_path,
+    //get_cache_dir_path
+};
 
+/*
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub(crate) struct AutoUpdate {
     pub(crate) repository: String,
     pub(crate) version: String,
 }
+*/
 
-pub(crate) fn auto_update(au: AutoUpdate) {
+pub(crate) fn auto_update(au: DataAutoUpdate, data: &mut IOData) {
     let cur_ver = get_current_version();
     info!("Current   stage1 version is {}", cur_ver);
     info!("Requested stage1 version is {}", au.version);
@@ -38,7 +48,8 @@ pub(crate) fn auto_update(au: AutoUpdate) {
         }
         info!("Requested version available at: {}", &file_path);
     }
-    au2cache(&au);
+    //au2cache(&au);
+    au2data(&au, data);
 }
 
 fn get_current_version() -> String {
@@ -53,7 +64,7 @@ fn get_target_file_path(version: &str) -> String {
     return target_dir_path;
 }
 
-fn get_source_file_path(au: &AutoUpdate) -> String {
+fn get_source_file_path(au: &DataAutoUpdate) -> String {
     if au.repository.starts_with("http") {
         return Url::parse(&au.repository)
             .unwrap()
@@ -70,7 +81,7 @@ fn get_source_file_path(au: &AutoUpdate) -> String {
     }
 }
 
-fn get_new_version(au: &AutoUpdate) -> Result<(),()> {
+fn get_new_version(au: &DataAutoUpdate) -> Result<(),()> {
     let target_file_string = get_target_file_path(&au.version);
     let target_file_path = Path::new(&target_file_string);
 
@@ -134,8 +145,8 @@ fn download_new_version(source: &Url, target: &Path) -> Result<(),()> {
         }
         Ok(())
 }
-
-fn au2cache(au: &AutoUpdate) {
+/*
+fn au2cache(au: &DataAutoUpdate) {
 
     let cache_dir_path = get_cache_dir_path();
     let _ = create_dir_path(Path::new(&cache_dir_path), 0o700);
@@ -162,8 +173,8 @@ fn au2cache(au: &AutoUpdate) {
         }
     };
 }
-
-fn cache2au() -> Result<AutoUpdate, String> {
+*//*
+fn cache2au() -> Result<DataAutoUpdate, String> {
     let cache_dir_path = get_cache_dir_path();
     let au_cache_file_path = format!("{cache_dir_path}/auto_update.json");
 
@@ -180,7 +191,7 @@ fn cache2au() -> Result<AutoUpdate, String> {
         },
     };
 
-    let au: AutoUpdate = match serde_json::from_str(&content) {
+    let au: DataAutoUpdate = match serde_json::from_str(&content) {
         Ok(au) => au,
         Err(e) => {
             return Err(format!("couldn't parse {au_cache_file_path} value as a valid configuration: {e}"));
@@ -188,12 +199,21 @@ fn cache2au() -> Result<AutoUpdate, String> {
     };
     Ok(au)
 }
-
-pub(crate) fn get_requested_exe_path(state: &State) -> String {
+*/
+pub(crate) fn get_requested_exe_path(state: &State, data: &mut IOData) -> String {
     let original_exe_path = state.exe_path.clone();
+    /*
     let au = match cache2au() {
         Ok(au) => au,
         Err(_) => {
+            return original_exe_path;
+        },
+    };
+    */
+
+    let au = match data2au(data) {
+        Some(au) => au,
+        None => {
             return original_exe_path;
         },
     };
@@ -205,4 +225,20 @@ pub(crate) fn get_requested_exe_path(state: &State) -> String {
         return original_exe_path;
     }
     file_path
+}
+
+pub(crate) fn data2au(data: &mut IOData) -> Option<DataAutoUpdate> {
+    let au = data.forward.clone().unwrap().auto_update.clone();
+    au
+}
+
+fn au2data(au: &DataAutoUpdate, data: &mut IOData) {
+    match &mut data.forward {
+        None => {
+            error!("data.forward shouldn;t be None at this stage");
+        },
+        Some(d) => {
+            d.auto_update = Some(au.clone());
+        },
+    }
 }

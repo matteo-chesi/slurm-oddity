@@ -3,7 +3,7 @@ use std::env;
 use std::error::Error;
 use std::fs::create_dir_all;
 use std::fs::Permissions;
-//use std::io::{self, Write};
+use std::io::{BufRead, BufReader, Write, Read};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -29,20 +29,21 @@ pub mod sync;
 
 use raster::{Config, EDF};
 
-use crate::autoupdate::{AutoUpdate, auto_update, get_requested_exe_path};
+use crate::autoupdate::{/*AutoUpdate,*/ auto_update, get_requested_exe_path};
 use crate::edf::{local_load_edf, modify_edf_for_sbatch, remote_load_edf};
 use crate::log::{setup_tracing};
 use crate::config::{load_config, render_user_job_config, setup_imagestore};
 use crate::dispatch::dispatch_execution;
 use crate::iodata::{
     IOData,
+    DataAutoUpdate,
     DataContainer,
     DataForward,
     get_iodata_from_stdin,
     send_iodata_to_stdout,
 };
-use crate::jobarg::{load_jobarg, load_jobarg_from_data};
-use crate::jobenv::{load_jobenv, load_jobenv_from_data};
+use crate::jobarg::{/*load_jobarg,*/ load_jobarg_from_data};
+use crate::jobenv::{/*load_jobenv,*/ load_jobenv_from_data};
 use crate::podman::{
     PODMAN_PIDFILE_NAME,
     podman_get_pid_from_file,
@@ -57,7 +58,7 @@ use crate::sync::{
     sync_cleanup_fs_shared,
 };
 
-pub(crate) const COLOR: &str = "BLUE";
+pub(crate) const COLOR: &str = "GREEN";
 pub(crate) const NAME: &str = "slurm-oddity";
 pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub(crate) const COMMAND_NAME: &str = "stage1";
@@ -150,13 +151,13 @@ pub(crate) struct ConsoleOutput {
     console_out: String,
 }
 
-fn run(args: &Args) {
+fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
     
     let mut data = match get_iodata_from_stdin() {
         Ok(d) => d,
         Err(e) => {
             error!("Error: cannot read input data: {e}");
-            return;
+            return Err("Error: cannot read input data: {e}".into());
         },
     };
     let config = load_config(&mut data);
@@ -170,23 +171,86 @@ fn run(args: &Args) {
     let span = tracing::span!(tracing::Level::INFO, APP_NAME);
     let _ = span.enter();
 
-    let requested_exe_path = get_requested_exe_path(&state);
+    let requested_exe_path = get_requested_exe_path(&state, &mut data);
+    info!("REQUESTED_EXE_PATH: {}", requested_exe_path);
     if state.exe_path != requested_exe_path {
-        Command::new(&requested_exe_path)
+        info!("STATE_EXE_PATH: {}", state.exe_path);
+        let input_json = serde_json::to_string(&data)?;
+        let (reader, mut writer) = std::io::pipe()?;
+
+        let mut child = Command::new(&requested_exe_path)
         .args(&env::args().collect::<Vec<String>>()[1..])
-        .output()
+        .stdin(reader)
+        .spawn()
         .expect(&format!("failed to execute {}", requested_exe_path));
-        return;
+
+        let msg = format!("{input_json}\n").as_bytes().to_vec();
+        writer.write_all(&msg)?;
+        writer.flush()?;
+
+        let stdout = match child.stdout.take() {
+            Some(out) => out,
+            None => {
+                return Err("failed to capture stdout".into());
+            },
+        };
+
+        let mut stderr = match child.stderr.take() {
+            Some(err) => err,
+            None => {
+                return Err("failed to capture stderr".into());
+            },
+        };
+
+        let reader = BufReader::new(stdout);
+
+        let mut msg_out;
+        for ret_msg in reader.lines() {
+            if ret_msg.is_ok() {
+                msg_out = ret_msg.unwrap().clone();
+                println!("{}", msg_out);
+            }
+        }
+
+        let result = child.wait();
+
+        if result.is_err() {
+            return Err("failed to execute process".into());
+        }
+
+        let status = result.unwrap();
+
+        let exit_code = match status.code() {
+            Some(rc) => rc.to_string(),
+            None => String::from("killed by signal"),
+        };
+
+        let mut stderr_vec = vec![];
+        let _ = stderr.read_to_end(&mut stderr_vec);
+        let mut stderr = String::from_utf8(stderr_vec).unwrap_or(String::from(""));
+        if ! stderr.is_empty() {
+            stderr.pop();
+            let lines = stderr.split('\n');
+            for line in lines {
+                eprintln!("{}", line);
+            }
+        };
+        let rc: i32 = match exit_code.parse() {
+            Ok(n) => n,
+            Err(_) => 1,
+        };
+        std::process::exit(rc);
     }
 
     log_start(&state);
     dispatch_execution(&mut state, &mut data);
     log_end(&state);
+    Ok(())
 }
 
 fn main() {
     let args = Args::parse();
-    run(&args);
+    let _ = run(&args);
 }
 
 pub(crate) fn load_state(
@@ -279,7 +343,7 @@ pub(crate) fn create_dir_path(dir_path: &Path, mode: u32) -> Result<(), Box<dyn 
     }
     Ok(())
 }
-
+/*
 pub(crate) fn get_cache_dir_path() -> String {
     let cache_path = expand_vars_string(CACHE_PATH.to_string()).unwrap();
 
@@ -296,7 +360,7 @@ pub(crate) fn get_cache_dir_path() -> String {
     let cache_dir_path = format!("{cache_path}/{cache_dirname}");
     return cache_dir_path;
 }
-
+*/
 pub(crate) fn setup_folders(
     state: &mut State,
 ) -> Result<(), Box<dyn Error>> {

@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::env::{VarError, remove_var, var};
-use std::{thread, time::Duration};
+//use std::{thread, time::Duration};
 use nix::unistd::{getegid, geteuid};
 use users::{get_current_uid, get_current_gid};
 use tracing::{error, info};

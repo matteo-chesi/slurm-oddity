@@ -1,8 +1,8 @@
 use std::env::var;
 use std::error::Error;
-use std::fs::File;
-use std::io::Write;
-use std::path::Path;
+//use std::fs::File;
+//use std::io::Write;
+//use std::path::Path;
 use tracing::{info};
 use raster::{EDF, render, mount::SarusMount};
 use crate::{
@@ -10,8 +10,8 @@ use crate::{
     LOCAL2REMOTE_VARNAME,
     IOData,
     State,
-    create_dir_path,
-    get_cache_dir_path,
+    //create_dir_path,
+    //get_cache_dir_path,
 };
 
 pub(crate) fn local_load_edf(state: &mut State, data: &mut IOData) {
@@ -49,7 +49,7 @@ pub(crate) fn remote_load_edf(state: &mut State) {
     state.edf = Some(edf);
 }
 
-
+/*
 fn add_edf_to_local2remote_data_file(edf: &EDF) {
     
     let cache_dir_path = get_cache_dir_path();
@@ -80,7 +80,7 @@ fn add_edf_to_local2remote_data_file(edf: &EDF) {
     let _ = file.flush();
     let _ = file.sync_all();
 }
-
+*/
 
 fn add_edf_to_local2remote_iodata(edf: &EDF, data: &mut IOData) {
    

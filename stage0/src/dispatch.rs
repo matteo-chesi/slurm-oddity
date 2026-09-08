@@ -71,6 +71,8 @@ unsafe impl Plugin for SpankStage0 {
 
         //let _ = run_stage1(self, spank, context, function, payload);
         let output = run_stage1_new2(self, spank, &mut io_data)?;
+        let json_value: serde_json::Value = serde_json::from_str(&output)?;
+        info!("OUTPUT:\n{:#?}", serde_json::to_string_pretty(&json_value));
         self.iodata = get_iodata_from_str(&output)?;
         set_local2remote_env_var_from_iodata(&mut self.iodata);
         

@@ -1,8 +1,9 @@
 use std::collections::HashMap;
-use std::fs::read_to_string;
-use std::path::Path;
-use crate::{IOData, get_cache_dir_path};
+//use std::fs::read_to_string;
+//use std::path::Path;
+use crate::{IOData, /*get_cache_dir_path*/};
 
+/*
 pub(crate) fn load_jobenv() -> HashMap<String, String> {
     let jobenv = match cache2jobenv() {
         Ok(je) => je,
@@ -10,7 +11,8 @@ pub(crate) fn load_jobenv() -> HashMap<String, String> {
     };
     jobenv
 }
-
+*/
+/*
 fn cache2jobenv() -> Result<HashMap<String, String>, String> {
     let cache_dir_path = get_cache_dir_path();
     let cache_file_path = format!("{cache_dir_path}/jobenv.json");
@@ -36,6 +38,7 @@ fn cache2jobenv() -> Result<HashMap<String, String>, String> {
     };
     Ok(h)
 }
+*/
 
 pub(crate) fn load_jobenv_from_data(data: &mut IOData) -> HashMap<String,String> {
 

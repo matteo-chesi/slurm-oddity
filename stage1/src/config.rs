@@ -11,7 +11,7 @@ use serde_json::{map::Entry, Value};
 use url::Url;
 use users::{get_current_groupname};
 //use regex::Regex;
-use tracing::{info};
+use tracing::{error, info};
 
 use raster::{Config,
     config::ConfigHooks as ConfigHooks,
@@ -21,7 +21,7 @@ use raster::{Config,
     update_config_by_user,
     load_config as raster_load_config};
 use crate::{
-    AutoUpdate,
+    DataAutoUpdate,
     DataForward,
     IOData,
     State,
@@ -42,18 +42,32 @@ pub(crate) fn load_config(data: &mut IOData) -> Config {
         data.forward = Some(
             DataForward {
                 config: config,
+                auto_update: None,
             }
         );
+    } else {
+        return data.forward.clone().unwrap().config;
     }
 
     let mut config = data.forward.clone().unwrap().config;
 
-    config = load_config_from_launch_control(&config);
     data.forward = Some(
         DataForward {
             config: config.clone(),
+            auto_update: None,
         }
     );
+
+    config = load_config_from_launch_control(&config, data);
+    
+    match &mut data.forward {
+        None => {
+            error!("data.forward shouldn't be None at this stage");
+        },
+        Some(d) => {
+            d.config = config.clone();
+        },
+    }
     config
 }
 /*
@@ -142,7 +156,7 @@ fn cache2config() -> Result<Config, String> {
     Ok(config)
 }
 */
-fn load_config_from_launch_control(old_config: &Config) -> Config {
+fn load_config_from_launch_control(old_config: &Config, data: &mut IOData) -> Config {
     let mut config = old_config.clone();
 
     // check if launch control is set
@@ -190,7 +204,7 @@ fn load_config_from_launch_control(old_config: &Config) -> Config {
     config = update_config_from_json(&mut config, &mut json);
 
     match get_auto_update_data_from_json(&json) {
-        Some(au) => auto_update(au),
+        Some(au) => auto_update(au, data),
         None => {},
     };
 
@@ -411,7 +425,7 @@ fn update_confighooks_from_value(cfghooks: &mut ConfigHooks, value: &Value) {
     }
 }
 
-fn get_auto_update_data_from_json(json: &Value) -> Option<AutoUpdate> {
+fn get_auto_update_data_from_json(json: &Value) -> Option<DataAutoUpdate> {
 
     let stage1_repository;
     let stage1_version;
@@ -451,7 +465,7 @@ fn get_auto_update_data_from_json(json: &Value) -> Option<AutoUpdate> {
         },
     };
 
-    Some(AutoUpdate {
+    Some(DataAutoUpdate {
         repository: stage1_repository,
         version: stage1_version,
     })

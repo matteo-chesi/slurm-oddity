@@ -1,8 +1,8 @@
-use std::error::Error;
-use std::fs::create_dir_all;
-use std::os::unix::fs::chown;
-use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
+//use std::error::Error;
+//use std::fs::create_dir_all;
+//use std::os::unix::fs::chown;
+//use std::os::unix::fs::MetadataExt;
+use std::path::{/*Path,*/ PathBuf};
 use const_format::formatcp;
 use serde::{Serialize, Deserialize};
 
@@ -30,7 +30,7 @@ pub(crate) use crate::log::{
     set_panic_hook,
 };
 pub(crate) use crate::stage1::{run_stage1_new2};
-pub(crate) use crate::state::{set_local2remote_env_var};
+//pub(crate) use crate::state::{set_local2remote_env_var};
 
 pub mod args;
 pub mod config;
@@ -53,9 +53,9 @@ pub(crate) const LOCAL_LOG_FILENAME: &str = formatcp!("${{DATETIME}}_${{CLUSTER_
 pub(crate) const REMOTE_LOG_FILENAME: &str = formatcp!("${{DATETIME}}_${{CLUSTER_NAME}}/job_${{SLURM_JOB_ID}}/${{HOSTNAME}}_{}.log", PLUGIN_NAME);
 pub(crate) const COMMAND_LOCAL_LOG_FILENAME: &str = formatcp!("${{DATETIME}}_${{CLUSTER_NAME}}/local_${{HOSTNAME}}_{}.log", COMMAND_NAME);
 pub(crate) const COMMAND_REMOTE_LOG_FILENAME: &str = formatcp!("${{DATETIME}}_${{CLUSTER_NAME}}/job_${{SLURM_JOB_ID}}/${{HOSTNAME}}_{}.log", COMMAND_NAME);
-pub(crate) const CACHE_PATH: &str = formatcp!("${{HOME}}/.local/share/{}/cache", NAME);
+//pub(crate) const CACHE_PATH: &str = formatcp!("${{HOME}}/.local/share/{}/cache", NAME);
 pub(crate) const LOCAL2REMOTE_VARNAME: &str = "SLURM_STAGE0_LOCAL2REMOTE_DATA";
-pub(crate) const LOCAL2REMOTE_FILENAME: &str = "local2remote_data.json";
+//pub(crate) const LOCAL2REMOTE_FILENAME: &str = "local2remote_data.json";
 
 SPANK_PLUGIN!(b"stage0", SLURM_VERSION_NUMBER, SpankStage0);
 
@@ -83,6 +83,7 @@ pub(crate) fn spank_getenv(spank: &mut SpankHandle, var: &str) -> String {
     }
 }
 
+/*
 pub(crate) fn create_dir_path(plugin: &mut SpankStage0, dir_path: &Path) -> Result<(), Box<dyn Error>> {
     let path = dir_path;
 
@@ -113,3 +114,4 @@ pub(crate) fn create_dir_path(plugin: &mut SpankStage0, dir_path: &Path) -> Resu
     }
     Ok(())
 }
+*/
