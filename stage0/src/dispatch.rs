@@ -69,13 +69,12 @@ unsafe impl Plugin for SpankStage0 {
 
         let _ = register_plugin_args(spank)?;
 
-        //let _ = run_stage1(self, spank, context, function, payload);
         let output = run_stage1_new2(self, spank, &mut io_data)?;
         let json_value: serde_json::Value = serde_json::from_str(&output)?;
         info!("OUTPUT:\n{:#?}", serde_json::to_string_pretty(&json_value));
         self.iodata = get_iodata_from_str(&output)?;
         set_local2remote_env_var_from_iodata(&mut self.iodata);
-        
+
         /*
         let json: serde_json::Value = match serde_json::from_str(&output) {
             Ok(j) => j,
@@ -125,6 +124,10 @@ unsafe impl Plugin for SpankStage0 {
 
         load_plugin_args(self, spank)?;
         let payload = self.args.payload.clone();
+        if payload.is_none() {
+            self.state.enabled = false;
+            return Ok(());
+        }
         update_iodata(self, spank, context.clone(), function.clone(), payload.clone())?;
         info!("IODATA:\n{}", serde_json::to_string_pretty(&self.iodata)?);
         
@@ -143,6 +146,9 @@ unsafe impl Plugin for SpankStage0 {
 
     fn user_init(&mut self, spank: &mut SpankHandle) -> Result<(), Box<dyn Error>> {
         log_init!();
+        if ! self.state.enabled {
+            return Ok(());
+        }
         //if !self.config.skybox_enabled {
         //    return Ok(());
         //}
@@ -167,6 +173,9 @@ unsafe impl Plugin for SpankStage0 {
 
     fn task_init(&mut self, spank: &mut SpankHandle) -> Result<(), Box<dyn Error>> {
         log_init!();
+        if ! self.state.enabled {
+            return Ok(());
+        }
         //if !self.config.skybox_enabled {
         //    return Ok(());
         //}
@@ -200,6 +209,9 @@ unsafe impl Plugin for SpankStage0 {
         //if !self.config.skybox_enabled {
         //    return Ok(());
         //}
+        if ! self.state.enabled {
+            return Ok(());
+        }
         let context;
         let function = String::from("exit");
         let payload = self.args.payload.clone();
@@ -258,6 +270,9 @@ unsafe impl Plugin for SpankStage0 {
         //if !self.config.skybox_enabled {
         //    return Ok(());
         //}
+        if ! self.state.enabled {
+            return Ok(());
+        }
         info!("TASK_EXIT");
         
         let context  = String::from("remote");
@@ -281,6 +296,9 @@ unsafe impl Plugin for SpankStage0 {
 
     fn task_init_privileged(&mut self, spank: &mut SpankHandle) -> Result<(), Box<dyn Error>> {
         log_init!();
+        if ! self.state.enabled {
+            return Ok(());
+        }
         //if !self.config.skybox_enabled {
         //    return Ok(());
         //}

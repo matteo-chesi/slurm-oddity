@@ -492,16 +492,17 @@ pub(crate) fn run_stage1_new2(
             return Err("Unknown username".into());
         }
         
-        if ! Path::new(&stage0.config.stage1_user_path).exists() {
-            if ! Path::new(&stage0.config.stage1_system_path).exists() {
-                let msg = format!("ERROR: cannot find stage1 executable at \"{}\"", &stage0.config.stage1_system_path);
-                info!("{msg}");
-                return Err(msg.into());
+        if ! Path::new(&data.source.config.stage1_user_path).exists() {
+            if ! Path::new(&data.source.config.stage1_system_path).exists() {
+                let msg = format!("ERROR: cannot find stage1 executable at \"{}\"", &data.source.config.stage1_system_path);
+                let msg2 = format!("CONFIG:\n{:#?}", &data.source.config);
+                info!("{msg}\n{msg2}");
+                return Err(format!("{msg}\n{msg2}").into());
             } else {
-                cmd2run = stage0.config.stage1_system_path.clone();
+                cmd2run = data.source.config.stage1_system_path.clone();
             }
         } else {
-            cmd2run = stage0.config.stage1_user_path.clone();
+            cmd2run = data.source.config.stage1_user_path.clone();
         }
 
         cmdname = String::from("/usr/bin/su");
@@ -523,16 +524,16 @@ pub(crate) fn run_stage1_new2(
             cmdstr = format!("{} {} -c {} --context {} --function {}", &cmdname, &username, &cmd2run, &context, &function);
         }
     } else {
-        if ! Path::new(&stage0.config.stage1_user_path).exists() {
-            if ! Path::new(&stage0.config.stage1_system_path).exists() {
-                let msg = format!("ERROR: cannot find stage1 executable at \"{}\"", &stage0.config.stage1_system_path);
+        if ! Path::new(&data.source.config.stage1_user_path).exists() {
+            if ! Path::new(&data.source.config.stage1_system_path).exists() {
+                let msg = format!("ERROR: cannot find stage1 executable at \"{}\"", &data.source.config.stage1_system_path);
                 info!("{msg}");
                 return Err(msg.into());
             } else {
-                cmdname = stage0.config.stage1_system_path.clone();
+                cmdname = data.source.config.stage1_system_path.clone();
             }
         } else {
-            cmdname = stage0.config.stage1_user_path.clone();
+            cmdname = data.source.config.stage1_user_path.clone();
         }
         cmdargs = vec!["--context", &context, "--function", &function];
         cmdstr = format!("{} --context {} --function {}", &cmdname, context, function);
