@@ -11,7 +11,7 @@ use crate::args::{Stage0Args, get_args};
 use crate::config::{Stage0Config, load_config};
 use crate::iodata::{
     IOData,
-    get_iodata,
+    //get_iodata,
     get_iodata_from_str,
     get_job_arg,
     get_job_env,
@@ -27,6 +27,7 @@ pub(crate) use crate::log::{
     format_error_chain,
     get_log_dirpath,
     get_command_log_filepath,
+    remove_empty_log_file,
     set_panic_hook,
 };
 pub(crate) use crate::stage1::{run_stage1_new2};

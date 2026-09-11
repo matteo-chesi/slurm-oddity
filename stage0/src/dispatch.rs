@@ -12,12 +12,13 @@ use crate::{
     SpankStage0,
     error_destination,
     format_error_chain,
-    get_iodata,
+    //get_iodata,
     get_iodata_from_str,
     init_log_file,
     //run_stage1,
     run_stage1_new2,
     //remote_run_stage1_new,
+    remove_empty_log_file,
     set_panic_hook,
     set_local2remote_env_var_from_iodata,
     update_iodata,
@@ -40,6 +41,7 @@ macro_rules! log_init {
 unsafe impl Plugin for SpankStage0 {
     fn init(&mut self, spank: &mut SpankHandle) -> Result<(), Box<dyn Error>> {
         log_init!();
+        /*
         info!("PROVA!");
 
         let context;
@@ -65,33 +67,16 @@ unsafe impl Plugin for SpankStage0 {
         dispatch_load_state(self, spank)?;
         dispatch_load_config(self, spank)?;
         let mut io_data = get_iodata(self, spank, context.clone(), function.clone(), payload.clone())?;
+        */
 
 
         let _ = register_plugin_args(spank)?;
-
+        /*
         let output = run_stage1_new2(self, spank, &mut io_data)?;
         let json_value: serde_json::Value = serde_json::from_str(&output)?;
         info!("OUTPUT:\n{:#?}", serde_json::to_string_pretty(&json_value));
         self.iodata = get_iodata_from_str(&output)?;
         set_local2remote_env_var_from_iodata(&mut self.iodata);
-
-        /*
-        let json: serde_json::Value = match serde_json::from_str(&output) {
-            Ok(j) => j,
-            Err(e) => {
-                error!("Error: cannot deserialize stage1 output");
-                return Err(e.into());
-            },
-        };
-        info!("OUTPUT:\n{}", serde_json::to_string_pretty(&json)?);
-        let iodata: IOData = match serde_json::from_value(json) {
-            Ok(j) => j,
-            Err(e) => {
-                info!("ERROR: {e}");
-                return Ok(());
-            },
-        };
-        self.iodata = Some(iodata);
         */
 
         Ok(())
@@ -128,12 +113,19 @@ unsafe impl Plugin for SpankStage0 {
             self.state.enabled = false;
             return Ok(());
         }
+        // Required to understand where to log.
+        dispatch_load_state(self, spank)?;
+        dispatch_load_config(self, spank)?;
+        //let mut io_data = get_iodata(self, spank, context.clone(), function.clone(), payload.clone())?;
+
         update_iodata(self, spank, context.clone(), function.clone(), payload.clone())?;
         info!("IODATA:\n{}", serde_json::to_string_pretty(&self.iodata)?);
         
+        /*
         if ! self.iodata.clone().unwrap().exchange.stage1_function_set.contains(&function) {
             return Ok(());
         }
+        */
 
         //let _ = run_stage1(self, spank, context, function, payload);
         let mut io_data = self.iodata.clone().unwrap();
@@ -210,6 +202,7 @@ unsafe impl Plugin for SpankStage0 {
         //    return Ok(());
         //}
         if ! self.state.enabled {
+            remove_empty_log_file(self);
             return Ok(());
         }
         let context;
@@ -246,6 +239,7 @@ unsafe impl Plugin for SpankStage0 {
         self.iodata = get_iodata_from_str(&output)?;
 
         //let _ = run_stage1(self, spank, context, function, payload);
+        remove_empty_log_file(self);
         Ok(())
     }
 

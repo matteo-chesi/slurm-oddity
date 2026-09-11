@@ -19,6 +19,7 @@ use slurm_spank::{Context, SpankHandle};
 use raster::expand_vars_string;
 
 use crate::{
+    NAME,
     //APP_NAME,
     DATETIME_FORMAT,
     LOG_PATH,
@@ -482,6 +483,77 @@ pub(crate) fn init_log_file(plugin: &mut SpankStage0, spank: &mut SpankHandle) {
         match create_file_path(spank, &path) {
             Ok(_) => {},
             Err(_) => return,
+        }
+    }
+}
+
+pub(crate) fn remove_empty_log_file(plugin: &mut SpankStage0) {
+    let path = plugin.log_file.clone();
+    let metadata = match std::fs::metadata(&path) {
+        Ok(m) => m,
+        Err(_) => {
+            return;
+        },
+    };
+
+    if metadata.len() != 0 {
+        return;
+    };
+
+    let _ = std::fs::remove_file(&path);
+
+    // Remove empty directory tree
+    let mut parent = match path.parent() {
+        Some(dir) => dir,
+        None => {
+            return;
+        },
+    };
+
+    let mut dirname = match parent.file_name() {
+        Some(name) => name,
+        None => {
+            return;
+        },
+    };
+
+    let mut done = false;
+    let mut last = false;
+    while ! done {
+
+        if dirname == NAME {
+            last = true;
+        }
+
+        let read_dir = match std::fs::read_dir(parent) {
+            Ok(r) => r,
+            Err(_) => {
+                break;
+            },
+        };
+
+        if read_dir.count() != 0 {
+            break;
+        }
+
+        let _ = std::fs::remove_dir(parent);
+
+        parent = match parent.parent() {
+            Some(dir) => dir,
+            None => {
+                break;
+            },
+        };
+
+        dirname = match parent.file_name() {
+            Some(name) => name,
+            None => {
+                break;
+            },
+        };
+
+        if last == true {
+            done = true;
         }
     }
 }

@@ -31,7 +31,7 @@ use raster::{Config, EDF};
 
 use crate::autoupdate::{/*AutoUpdate,*/ auto_update, get_requested_exe_path};
 use crate::edf::{local_load_edf, modify_edf_for_sbatch, remote_load_edf};
-use crate::log::{setup_tracing};
+use crate::log::{setup_tracing, remove_empty_log_file};
 use crate::config::{load_config, render_user_job_config, setup_imagestore};
 use crate::dispatch::dispatch_execution;
 use crate::iodata::{

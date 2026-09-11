@@ -20,6 +20,7 @@ use crate::{
     modify_edf_for_sbatch,
     podman_get_pid_from_file,
     remote_load_edf,
+    remove_empty_log_file,
     render_user_job_config,
     send_iodata_to_stdout,
     setup_folders,
@@ -28,7 +29,7 @@ use crate::{
     sync_podman_stop,
     sync_cleanup_fs_shared,
 };
-
+/*
 pub(crate) fn slurmstepd_init(_state: &mut State, data: &mut IOData) {
 
     /*
@@ -61,6 +62,7 @@ pub(crate) fn slurmstepd_init(_state: &mut State, data: &mut IOData) {
         },
     };
 }
+*/
 
 pub(crate) fn slurmstepd_init_post_opt(state: &mut State, data: &mut IOData) {
     
@@ -76,6 +78,13 @@ pub(crate) fn slurmstepd_init_post_opt(state: &mut State, data: &mut IOData) {
 
     info!("INPUT:\n{:#?}", data);
     
+    data.exchange.stage1_function_set = vec![
+        "init_post_opt".to_string(),
+        "task_init".to_string(),
+        "task_exit".to_string(),
+        "exit".to_string(),
+    ];
+
     info!("OUTPUT:\n{:#?}", data);
 
     remote_load_edf(state);
@@ -199,6 +208,8 @@ pub(crate) fn slurmstepd_exit(state: &mut State, data: &mut IOData) {
             return;
         },
     }
+    
+    let _ = remove_empty_log_file(state);
 }
 
 pub(crate) fn remote_unset_env_vars(state: &mut State) -> Result<(), Box<dyn Error>> {

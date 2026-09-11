@@ -110,10 +110,9 @@ pub(crate) fn update_iodata(
     */
 
     if plugin.iodata.is_none() {
-        if function == "init" {
-            let iodata = get_iodata(plugin, spank, context, function, payload)?;
+        if function == "init_post_opt" {
+            let iodata = get_iodata(plugin, spank, context.clone(), function.clone(), payload.clone())?;
             plugin.iodata = Some(iodata);
-            return Ok(());
         } else {
             return Err("ERROR: IOData is not initialized!".into());
         }
