@@ -346,5 +346,5 @@ pub(crate) fn announce(data: &mut IOData) {
         status = "dead";
     }
 
-    console_output(&format!("I am {} {} cat!\n", COLOR, status));
+    console_output(&format!("I am a {} {} cat!\n", COLOR, status));
 }
