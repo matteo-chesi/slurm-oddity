@@ -7,10 +7,11 @@ LIB_DIR="${BASE_DIR}/lib"
 if [ ! -d "${LIB_DIR}/venv" ]
 then
   pushd ${LIB_DIR} 1>/dev/null
-  ${PYTHON} -m venv ./venv &>/dev/null
+  python3 -m venv ./venv &>/dev/null
   source ./venv/bin/activate
   python3 -m pip install flask &>/dev/null
   popd 1>/dev/null
 fi
 
-${LIB_DIR}/venv/bin/python3 ${LIB_DIR}/cli.py $@
+#${LIB_DIR}/venv/bin/python3 ${LIB_DIR}/cli.py $@
+${PYTHON} ${LIB_DIR}/cli.py $@
