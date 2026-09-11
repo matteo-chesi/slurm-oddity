@@ -1,4 +1,8 @@
 {
   "stage1_repository": "/scratch/shared/scratch/chesim/slurm-oddity/repository/stage1",
-  "stage1_version": "0.0.2"
+  "stage1_version": "0.0.2",
+  "config": {
+	  "parallax_imagestore": "/scratch/shared/scratch/$USER/.parallax_imagestore_blue",
+	  "poison": true
+  }
 }

@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+//use std::collections::HashMap;
 //use std::env::{self, remove_var, set_var, var};
-use std::env::{remove_var, set_var, var};
+//use std::env::{remove_var, set_var, var};
 use std::error::Error;
 use std::fs::{
     File,
@@ -10,25 +10,25 @@ use std::fs::{
 //use std::io::Write;
 use std::os::unix::fs::{chown, MetadataExt};
 use std::panic::PanicHookInfo;
-use std::path::{Path, PathBuf};
+use std::path::{Path, /*PathBuf*/};
 use std::sync::Mutex;
 
-use chrono::{Local};
+//use chrono::{Local};
 //use chrono::{Utc, Local};
 //use chrono_tz::Tz;
 //use gethostname::gethostname;
 use tracing_subscriber::fmt;
 use tracing::{Level};
 
-use raster::expand_vars_string;
+//use raster::expand_vars_string;
 
 use crate::{
-    DATETIME_FORMAT,
-    LOG_PATH,
-    LOCAL_LOG_FILENAME,
+    //DATETIME_FORMAT,
+    //LOG_PATH,
+    //LOCAL_LOG_FILENAME,
     NAME,
-    REMOTE_LOG_FILENAME,
-    Context,
+    //REMOTE_LOG_FILENAME,
+    //Context,
     State,
 };
 
@@ -110,12 +110,36 @@ pub(crate) fn get_log_dirpath() -> String {
 }
 */
 
+/*
 pub(crate) fn setup_tracing(state: &mut State) -> Result<(), Box<dyn Error>> {
     init_log_file(state);
     set_panic_hook();
     let path = &state.log_file;
 
     let file = match OpenOptions::new().create(false).append(true).open(path) {
+        Ok(f) => f,
+        Err(_) => return Ok(()),
+    };
+
+    let subscriber = fmt()
+        .with_writer(Mutex::new(file))
+        .with_ansi(false)
+        .with_target(false)
+        .with_level(false)
+        .with_timer(fmt::time::LocalTime::rfc_3339())
+        .with_max_level(Level::INFO)
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber)?;
+    Ok(())
+}
+*/
+pub(crate) fn setup_tracing(log_file_path: &Path) -> Result<(), Box<dyn Error>> {
+    init_log_file(log_file_path);
+    set_panic_hook();
+    //let path = &state.log_file;
+
+    let file = match OpenOptions::new().create(false).append(true).open(log_file_path) {
         Ok(f) => f,
         Err(_) => return Ok(()),
     };
@@ -165,7 +189,7 @@ pub fn panic_hook(panic_info: &PanicHookInfo<'_>) {
 
     tracing::error!("{} {}", payload_str, location_str);
 }
-
+/*
 fn log_dir(state: &mut State) -> PathBuf {
     let mut log_dir = PathBuf::from("/tmp".to_string());
     let mut jobenv = None;
@@ -184,7 +208,7 @@ fn log_dir(state: &mut State) -> PathBuf {
 
     return log_dir;
 }
-
+*/
 fn set_ownership(path: &Path, uid: Option<u32>, gid: Option<u32>) -> Result<(), Box<dyn Error>> {
     if (uid.is_some() &&
         ( std::fs::metadata(&path).unwrap().uid() != uid.unwrap())) ||
@@ -216,10 +240,11 @@ fn create_dir_path(path: &Path, uid: Option<u32>, gid: Option<u32>) -> Result<()
     Ok(())
 }
 
-fn create_file_path(state: &mut State, path: &Path) -> Result<(), Box<dyn Error>> {
-    let mut uid = None;
-    let mut gid = None;
+fn create_file_path(/*state: &mut State,*/ path: &Path) -> Result<(), Box<dyn Error>> {
+    let uid = Some(users::get_current_uid());
+    let gid = Some(users::get_current_gid());
 
+    /*
     match state.args.context {
         Context::Remote => {
             uid = match &state.job {
@@ -233,6 +258,7 @@ fn create_file_path(state: &mut State, path: &Path) -> Result<(), Box<dyn Error>
         },
         _ => {},
     }
+    */
 
     if ! path.exists() {
         match path.parent() {
@@ -248,7 +274,7 @@ fn create_file_path(state: &mut State, path: &Path) -> Result<(), Box<dyn Error>
     }
     Ok(())
 }
-
+/*
 fn set_local_environment_for_log_filename() {
     let datetime = Local::now().format(&DATETIME_FORMAT).to_string();
 
@@ -264,7 +290,8 @@ fn set_local_environment_for_log_filename() {
         },
     }
 }
-
+*/
+/*
 fn get_remote_environment_for_log_filename(state: &mut State) -> HashMap<String,String> {
 
     let mut jobenv = state.job_env.clone();
@@ -281,15 +308,15 @@ fn get_remote_environment_for_log_filename(state: &mut State) -> HashMap<String,
 
     return jobenv;
 }
-
-
+*/
+/*
 fn unset_local_environment_for_log_filename() {
     unsafe {
         remove_var("DATETIME");
     };
 }
-
-
+*/
+/*
 pub(crate) fn init_log_file(state: &mut State) {
 
     let path;
@@ -302,6 +329,16 @@ pub(crate) fn init_log_file(state: &mut State) {
 
     if ! path.exists() {
         match create_file_path(state, &path) {
+            Ok(_) => {},
+            Err(_) => return,
+        }
+    }
+}
+*/
+pub(crate) fn init_log_file(log_file_path: &Path) {
+
+    if ! log_file_path.exists() {
+        match create_file_path(log_file_path) {
             Ok(_) => {},
             Err(_) => return,
         }
@@ -379,7 +416,7 @@ pub(crate) fn remove_empty_log_file(state: &mut State) {
     }
 
 }
-
+/*
 fn set_log_filename(state: &mut State) -> Result<(), Box<dyn Error>> {
     let log_dir = log_dir(state);
     let log_filename;
@@ -406,4 +443,4 @@ fn set_log_filename(state: &mut State) -> Result<(), Box<dyn Error>> {
 
    Ok(())
 }
-
+*/

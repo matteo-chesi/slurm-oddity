@@ -63,10 +63,10 @@ pub(crate) const NAME: &str = "slurm-oddity";
 pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub(crate) const COMMAND_NAME: &str = "stage1";
 pub(crate) const APP_NAME: &str = formatcp!("{}-{}", COMMAND_NAME, VERSION);
-pub(crate) const LOG_PATH: &str = formatcp!("${{HOME}}/.local/share/{}/log", NAME);
-pub(crate) const DATETIME_FORMAT: &str = "%Y%m%d";
-pub(crate) const LOCAL_LOG_FILENAME: &str = formatcp!("${{DATETIME}}_${{CLUSTER_NAME}}/local_${{HOSTNAME}}_{}.log", COMMAND_NAME);
-pub(crate) const REMOTE_LOG_FILENAME: &str = formatcp!("${{DATETIME}}_${{CLUSTER_NAME}}/job_${{SLURM_JOB_ID}}/${{SLURM_TOPOLOGY_ADDR}}_{}.log", COMMAND_NAME);
+//pub(crate) const LOG_PATH: &str = formatcp!("${{HOME}}/.local/share/{}/log", NAME);
+//pub(crate) const DATETIME_FORMAT: &str = "%Y%m%d";
+//pub(crate) const LOCAL_LOG_FILENAME: &str = formatcp!("${{DATETIME}}_${{CLUSTER_NAME}}/local_${{HOSTNAME}}_{}.log", COMMAND_NAME);
+//pub(crate) const REMOTE_LOG_FILENAME: &str = formatcp!("${{DATETIME}}_${{CLUSTER_NAME}}/job_${{SLURM_JOB_ID}}/${{SLURM_TOPOLOGY_ADDR}}_{}.log", COMMAND_NAME);
 pub(crate) const CACHE_PATH: &str = formatcp!("${{HOME}}/.local/share/{}/cache", NAME);
 pub(crate) const LOCAL2REMOTE_VARNAME: &str = "SLURM_STAGE0_LOCAL2REMOTE_DATA";
 pub(crate) const SLURM_BATCH_SCRIPT: u32 = 0xfffffffb;
@@ -160,6 +160,13 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
             return Err("Error: cannot read input data: {e}".into());
         },
     };
+    
+    // Start Tracing
+    let _ = setup_tracing(&data.exchange.stage1_log_file);
+    let span = tracing::span!(tracing::Level::INFO, APP_NAME);
+    let _ = span.enter();
+    info!("STARTING");
+    
     let config = load_config(&mut data);
     let job_arg = load_jobarg_from_data(&mut data);
     let job_env = load_jobenv_from_data(&mut data);
@@ -168,8 +175,6 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
 
     let mut state = load_state(args, &config, &job_arg, &job_env);
     // Start Tracing
-    let span = tracing::span!(tracing::Level::INFO, APP_NAME);
-    let _ = span.enter();
 
     let requested_exe_path = get_requested_exe_path(&state, &mut data);
     info!("REQUESTED_EXE_PATH: {}", requested_exe_path);
@@ -273,7 +278,7 @@ pub(crate) fn load_state(
 
     let exe_args = env::args().collect::<Vec<String>>()[1..].join(" ");
     
-    let mut state = State {
+    let state = State {
         log_file: PathBuf::new(), 
         exe_user: exe_user,
         exe_path: exe_path,
@@ -289,7 +294,7 @@ pub(crate) fn load_state(
         run: None,
     };
 
-    let _ = setup_tracing(&mut state);
+    //let _ = setup_tracing(&mut state);
 
     state
 }

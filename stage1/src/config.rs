@@ -17,6 +17,7 @@ use raster::{Config,
     config::ConfigHooks as ConfigHooks,
     config::remove_sarus_annotations,
     ExecutedCommand,
+    expand_vars_string,
     hook_run,
     update_config_by_user,
     load_config as raster_load_config};
@@ -201,7 +202,7 @@ fn load_config_from_launch_control(old_config: &Config, data: &mut IOData) -> Co
     };
     info!("Launch Control Response:\n{}", serde_json::to_string_pretty(&json).unwrap());
 
-    config = update_config_from_json(&mut config, &mut json);
+    config = update_config_from_json(&mut config, &mut json, data);
 
     match get_auto_update_data_from_json(&json) {
         Some(au) => auto_update(au, data),
@@ -248,7 +249,7 @@ fn build_query_input() -> HashMap<String, String> {
     return input;
 }
 
-fn update_config_from_json(old_config: &mut Config, json: &mut Value) -> Config {
+fn update_config_from_json(old_config: &mut Config, json: &mut Value, data: &mut IOData) -> Config {
 
     let mut config = old_config.clone();
 
@@ -262,7 +263,7 @@ fn update_config_from_json(old_config: &mut Config, json: &mut Value) -> Config 
     let config_val = root.entry("config".to_string());
     match config_val {
         Entry::Occupied(mut entry) => {
-            update_config_from_value(&mut config, &mut entry.get_mut());
+            update_config_from_value(&mut config, &mut entry.get_mut(), data);
         },
         Entry::Vacant(_) => {},
     };
@@ -270,7 +271,7 @@ fn update_config_from_json(old_config: &mut Config, json: &mut Value) -> Config 
     config
 }
 
-fn update_config_from_value(config: &mut Config, value: &mut Value) {
+fn update_config_from_value(config: &mut Config, value: &mut Value, data: &mut IOData) {
 
     // ensure it is an object
     let config_obj = match value.as_object() {
@@ -279,6 +280,13 @@ fn update_config_from_value(config: &mut Config, value: &mut Value) {
                 return;
             },
     };
+
+    //Retrieve jobenv
+    let jobenv = match data.exchange.slurm_context.as_str() {
+        "remote" => Some(data.exchange.job_env.clone()),
+        "local"|"allocator"|_ => None,
+    };
+    //let mut jobenv = data.exchange.unwrap().job_env.clone();
 
     // Loop through config keys
     for (key, value) in config_obj.into_iter() {
@@ -305,7 +313,15 @@ fn update_config_from_value(config: &mut Config, value: &mut Value) {
             },
             "parallax_imagestore" => {
                 if value.is_string() {
-                    config.parallax_imagestore = String::from(value.as_str().unwrap());
+                    config.parallax_imagestore = match expand_vars_string(
+                        String::from(value.as_str().unwrap()),
+                        &jobenv,
+                        ) {
+                        Ok(s) => s,
+                        Err(_) => {
+                            continue;
+                        },
+                    }
                 }
             },
             "parallax_imagestore_keepalive" => {
@@ -395,6 +411,11 @@ fn update_config_from_value(config: &mut Config, value: &mut Value) {
             "tracking_tool" => {
                 if value.is_string() {
                     config.tracking_tool = String::from(value.as_str().unwrap());
+                }
+            },
+            "poison" => {
+                if value.is_boolean() {
+                    config.poison = value.as_bool().unwrap();
                 }
             },
             _ => {},

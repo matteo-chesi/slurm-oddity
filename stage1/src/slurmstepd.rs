@@ -136,7 +136,7 @@ pub(crate) fn slurmstepd_task_init(state: &mut State, data: &mut IOData) {
     info!("EDF_INFO:\n{:#?}", state.edf);
     info!("YUPPIE!");
     
-    console_output(&format!("I am {} !\n", COLOR));
+    announce(data);
     //thread::sleep(Duration::from_millis(5000));
     //console_output("YEAH!!!");
     
@@ -334,4 +334,17 @@ pub(crate) fn run_get_info(state: &mut State) -> Result<(), Box<dyn Error>> {
     state.run = Some(run.clone());
 
     Ok(())
+}
+
+pub(crate) fn announce(data: &mut IOData) {
+
+    let status;
+
+    if ! data.forward.as_ref().unwrap().config.poison {
+        status = "living";
+    } else {
+        status = "dead";
+    }
+
+    console_output(&format!("I am {} {} cat!\n", COLOR, status));
 }
