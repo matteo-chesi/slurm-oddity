@@ -64,7 +64,7 @@ pub(crate) fn slurmstepd_init(_state: &mut State, data: &mut IOData) {
 }
 */
 
-pub(crate) fn slurmstepd_init_post_opt(state: &mut State, data: &mut IOData) {
+pub(crate) fn slurmstepd_init_post_opt(state: &mut State, data: &mut IOData) -> Result<(), Box<dyn Error>> {
     
     /*
     let mut data = match get_iodata_from_stdin() {
@@ -87,7 +87,7 @@ pub(crate) fn slurmstepd_init_post_opt(state: &mut State, data: &mut IOData) {
 
     info!("OUTPUT:\n{:#?}", data);
 
-    remote_load_edf(state);
+    remote_load_edf(state)?;
     let _ = job_get_info(state);
     info!("JOB_INFO:\n{:#?}", state.job);
     let _ = remote_unset_env_vars(state);
@@ -95,13 +95,15 @@ pub(crate) fn slurmstepd_init_post_opt(state: &mut State, data: &mut IOData) {
     match send_iodata_to_stdout(&data) {
         Ok(_) => {},
         Err(e) => {
-            error!("Error: cannot send output data: {e}");
-            return;
+            let emsg = format!("Error: cannot send output data: {e}");
+            error!("{emsg}");
+            return Err(emsg.into());
         },
     };
+    Ok(())
 }
 
-pub(crate) fn slurmstepd_task_init(state: &mut State, data: &mut IOData) {
+pub(crate) fn slurmstepd_task_init(state: &mut State, data: &mut IOData) -> Result<(), Box<dyn Error>> {
     /*
     info!("OK TASK INIT");
     let mut data = match get_iodata_from_stdin() {
@@ -115,41 +117,33 @@ pub(crate) fn slurmstepd_task_init(state: &mut State, data: &mut IOData) {
 
     info!("INPUT:\n{:#?}", data);
     
-    remote_load_edf(state);
+    remote_load_edf(state)?;
     let _ = job_get_info(state);
     let _ = run_get_info(state);
     match render_user_job_config(state) {
         Ok(_) => {},
-        Err(_) => return,
+        Err(_) => {
+            let emsg = "Error: Cannot render user job";
+            error!("{emsg}");
+            return Err(emsg.into());
+        },
     };
     let _ = setup_folders(state);
     let _ = modify_edf_for_sbatch(state);
-    
-
-    info!("CONFIG:\n{:#?}", state.config);
-    info!("RUN_INFO:\n{:#?}", state.run);
-    info!("JOB_INFO:\n{:#?}", state.job);
-    //info!("JOB_ARG:\n{:#?}", state.job_arg);
-    info!("JOB_ARG2:\n{:#?}", data.exchange.job_arg);
-    //info!("JOB_ENV:\n{:#?}", state.job_env);
-    info!("JOB_ENV2:\n{:#?}", data.exchange.job_env);
-    info!("EDF_INFO:\n{:#?}", state.edf);
-    info!("YUPPIE!");
     
     announce(data);
     //thread::sleep(Duration::from_millis(5000));
     //console_output("YEAH!!!");
     
     let _ = sync_podman_pull(state);
-    info!("YEAH!!");
     let _ = sync_podman_start(state);
-    info!("STAKAZZO");
 
     let pid: u32 = match state.run.clone().unwrap().pid.try_into() {
         Ok(p) => p,
         Err(_) => {
-            error!("Error: convert pid in u32");
-            return;
+            let emsg = "Error: convert pid in u32";
+            error!("{emsg}");
+            return Err(emsg.into());
         },
     };
     
@@ -167,13 +161,15 @@ pub(crate) fn slurmstepd_task_init(state: &mut State, data: &mut IOData) {
     match send_iodata_to_stdout(&data) {
         Ok(_) => {},
         Err(e) => {
-            error!("Error: cannot send output data: {e}");
-            return;
+            let emsg = format!("Error: cannot send output data: {e}");
+            error!("{emsg}");
+            return Err(emsg.into());
         },
     }
+    Ok(())
 }
 
-pub(crate) fn slurmstepd_task_exit(state: &mut State, data: &mut IOData) {
+pub(crate) fn slurmstepd_task_exit(state: &mut State, data: &mut IOData) -> Result<(), Box<dyn Error>> {
     //info!("INPUT:\n{:#?}", data);
     
     let _ = job_get_info(state);
@@ -185,13 +181,15 @@ pub(crate) fn slurmstepd_task_exit(state: &mut State, data: &mut IOData) {
     match send_iodata_to_stdout(&data) {
         Ok(_) => {},
         Err(e) => {
-            error!("Error: cannot send output data: {e}");
-            return;
+            let emsg = format!("Error: cannot send output data: {e}");
+            error!("{emsg}");
+            return Err(emsg.into());
         },
     }
+    Ok(())
 }
 
-pub(crate) fn slurmstepd_exit(state: &mut State, data: &mut IOData) {
+pub(crate) fn slurmstepd_exit(state: &mut State, data: &mut IOData) -> Result<(), Box<dyn Error>> {
     //info!("INPUT:\n{:#?}", data);
     
     let _ = job_get_info(state);
@@ -204,16 +202,23 @@ pub(crate) fn slurmstepd_exit(state: &mut State, data: &mut IOData) {
     match send_iodata_to_stdout(&data) {
         Ok(_) => {},
         Err(e) => {
-            error!("Error: cannot send output data: {e}");
-            return;
+            let emsg = format!("Error: cannot send output data: {e}");
+            error!("{emsg}");
+            return Err(emsg.into());
         },
     }
     
     let _ = remove_empty_log_file(state);
+    Ok(())
 }
 
 pub(crate) fn remote_unset_env_vars(state: &mut State) -> Result<(), Box<dyn Error>> {
-    let edf_env = state.edf.clone().unwrap().env;
+
+    let edf_env = match state.edf.clone() {
+        Some(edf) => edf.env,
+        None => return Ok(()),
+    };
+
     let mut unset_keys = vec![];
 
     for (key, value) in edf_env.iter() {

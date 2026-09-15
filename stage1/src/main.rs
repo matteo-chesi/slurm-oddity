@@ -248,7 +248,13 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     log_start(&state);
-    dispatch_execution(&mut state, &mut data);
+    match dispatch_execution(&mut state, &mut data) {
+        Ok(_) => {},
+        Err(_) => {
+            log_end(&state);
+            std::process::exit(1);
+        },
+    };
     log_end(&state);
     Ok(())
 }

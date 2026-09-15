@@ -180,7 +180,7 @@ fn load_config_from_launch_control(old_config: &Config, data: &mut IOData) -> Co
         .build()
         .unwrap();
 
-    let query_input = build_query_input();
+    let query_input = build_query_input(data);
     let query_output = client.post(query_url.clone()).json(&query_input).send();
     info!("Query Launch Control at: {}", query_url.as_str());
     info!("Query Input:\n{}", serde_json::to_string_pretty(&query_input).unwrap());
@@ -212,7 +212,14 @@ fn load_config_from_launch_control(old_config: &Config, data: &mut IOData) -> Co
     config
 }
 
-fn build_query_input() -> HashMap<String, String> {
+fn build_query_input(data: &mut IOData) -> HashMap<String, String> {
+    match data.exchange.slurm_context.as_str() {
+        "remote" => remote_build_query_input(data),
+        _ => local_build_query_input(),
+    }
+}
+
+fn local_build_query_input() -> HashMap<String, String> {
     let mut input = HashMap::new();
 
     let unknown_job = String::from("0");
@@ -246,6 +253,25 @@ fn build_query_input() -> HashMap<String, String> {
     input.insert("account".to_string(), account.to_string());
     input.insert("user".to_string(), user.to_string());
 
+    return input;
+}
+
+fn remote_build_query_input(data: &mut IOData) -> HashMap<String, String> {
+    let mut input = HashMap::new();
+    
+    let unknown_job = String::from("0");
+    let unknown = String::from("UNKNOWN");
+    let job_env = &data.exchange.job_env;
+    let job = job_env.get("SLURM_JOB_ID").unwrap_or(&unknown_job);
+    let system = job_env.get("CLUSTER_NAME").unwrap_or(&unknown);
+    let account = job_env.get("SLURM_JOB_ACCOUNT").unwrap_or(&unknown);
+    let user = job_env.get("SLURM_JOB_USER").unwrap_or(&unknown);
+
+    input.insert("job".to_string(), job.to_string());
+    input.insert("system".to_string(), system.to_string());
+    input.insert("account".to_string(), account.to_string());
+    input.insert("user".to_string(), user.to_string());
+    
     return input;
 }
 

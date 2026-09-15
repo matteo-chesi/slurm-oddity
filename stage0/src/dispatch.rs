@@ -129,7 +129,13 @@ unsafe impl Plugin for SpankStage0 {
 
         //let _ = run_stage1(self, spank, context, function, payload);
         let mut io_data = self.iodata.clone().unwrap();
-        let output = run_stage1_new2(self, spank, &mut io_data)?;
+        let output = match run_stage1_new2(self, spank, &mut io_data) {
+            Ok(out) => out,
+            Err(e) => {
+                self.state.enabled = false;
+                return Err(e);
+            },
+        };
         self.iodata = get_iodata_from_str(&output)?;
         set_local2remote_env_var_from_iodata(&mut self.iodata);
 

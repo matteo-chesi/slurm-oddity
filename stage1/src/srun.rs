@@ -1,3 +1,4 @@
+use std::error::Error;
 use raster::{update_config_by_user};
 use tracing::{error, info};
 
@@ -10,7 +11,7 @@ use crate::{
     send_iodata_to_stdout,
 };
 
-pub(crate) fn srun_init_post_opt(state: &mut State, data: &mut IOData) {
+pub(crate) fn srun_init_post_opt(state: &mut State, data: &mut IOData) -> Result<(), Box<dyn Error>> {
     /*
     // Read Input
     let mut data = match get_iodata_from_stdin() {
@@ -28,7 +29,7 @@ pub(crate) fn srun_init_post_opt(state: &mut State, data: &mut IOData) {
         "init_post_opt".to_string(),
     ];
 
-    local_load_edf(state, data);
+    local_load_edf(state, data)?;
     let _ = update_config_by_user(&mut state.config, state.edf.clone().unwrap());
     
     info!("OUTPUT:\n{:#?}", data);
@@ -36,12 +37,14 @@ pub(crate) fn srun_init_post_opt(state: &mut State, data: &mut IOData) {
     match send_iodata_to_stdout(&data) {
         Ok(_) => {},
         Err(e) => {
-            error!("Error: cannot send output data: {e}");
-            return;
+            let emsg = format!("Error: cannot send output data: {e}");
+            error!("{emsg}");
+            return Err(emsg.into());
         },
     };
 
     let _ = remove_empty_log_file(state);
+    Ok(())
 }
 
 /*

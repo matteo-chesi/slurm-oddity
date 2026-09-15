@@ -1,3 +1,4 @@
+use std::error::Error;
 use crate::{
     IOData,
     //Context,
@@ -27,21 +28,22 @@ pub(crate) fn dispatch_execution(state: &mut State, data: &mut IOData) {
 }
 */
 
-pub(crate) fn dispatch_execution(state: &mut State, data: &mut IOData) {
+pub(crate) fn dispatch_execution(state: &mut State, data: &mut IOData) -> Result<(), Box<dyn Error>> {
     if data.exchange.slurm_context == "local" {
       match data.exchange.slurm_function.as_str() {
-        "init_post_opt" => srun_init_post_opt(state, data),
+        "init_post_opt" => srun_init_post_opt(state, data)?,
         _ => {}, 
       }
     }
     if data.exchange.slurm_context == "remote" {
       match data.exchange.slurm_function.as_str() {
-        "init_post_opt" => slurmstepd_init_post_opt(state, data),
-        "task_init" => slurmstepd_task_init(state, data),
-        "task_exit" => slurmstepd_task_exit(state, data),
-        "exit" => slurmstepd_exit(state, data),
+        "init_post_opt" => slurmstepd_init_post_opt(state, data)?,
+        "task_init" => slurmstepd_task_init(state, data)?,
+        "task_exit" => slurmstepd_task_exit(state, data)?,
+        "exit" => slurmstepd_exit(state, data)?,
         _ => {}, 
       }
     }
+    Ok(())
 }
 

@@ -14,20 +14,24 @@ use crate::{
     //get_cache_dir_path,
 };
 
-pub(crate) fn local_load_edf(state: &mut State, data: &mut IOData) {
+pub(crate) fn local_load_edf(state: &mut State, data: &mut IOData) -> Result<(), Box<dyn Error>> {
     let edf_name = match &state.args.payload {
         Some(name) => String::from(name),
         None => {
-            info!("Error: cannot read payload argument");
-            return ();
+            let emsg = "Error: cannot read payload argument";
+            info!("{emsg}");
+            eprintln!("{emsg}");
+            return Err(emsg.into());
         }
     };
 
     let edf = match render(edf_name.clone()) {
         Ok(f) => f,
         Err(_) => {
-            info!("Error: cannot render edf \"{edf_name}\"");
-            return ();
+            let emsg = format!("Error: cannot render edf \"{edf_name}\"");
+            info!("{emsg}");
+            eprintln!("{emsg}");
+            return Err(emsg.into());
         },
     };
 
@@ -35,18 +39,22 @@ pub(crate) fn local_load_edf(state: &mut State, data: &mut IOData) {
     //add_edf_to_local2remote_data_file(&edf);
     add_edf_to_local2remote_iodata(&edf, data);
     state.edf = Some(edf);
+    Ok(())
 }
 
-pub(crate) fn remote_load_edf(state: &mut State) {
+pub(crate) fn remote_load_edf(state: &mut State) -> Result<(), Box<dyn Error>> {
     let edf = match get_edf_from_local2remote_data_env() {
         Ok(v) => v,
         Err(_) => {
-            info!("Error: cannot parse EDF from environment variable");
-            return ();
+            let emsg = "Error: cannot parse EDF from environment variable";
+            info!("{emsg}");
+            eprintln!("{emsg}");
+            return Err(emsg.into());
         },
     };
 
     state.edf = Some(edf);
+    Ok(())
 }
 
 /*

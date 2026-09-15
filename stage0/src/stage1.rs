@@ -608,6 +608,7 @@ pub(crate) fn run_stage1_new2(
     info!("RC: {}", exit_code);
 
     let mut stderr_vec = vec![];
+    let mut errmsg_out = "".to_string();
     let _ = stderr.read_to_end(&mut stderr_vec);
     let mut stderr = String::from_utf8(stderr_vec).unwrap_or(String::from(""));
     if ! stderr.is_empty() {
@@ -615,7 +616,9 @@ pub(crate) fn run_stage1_new2(
         let lines = stderr.split('\n');
         for line in lines {
             info!("stderr: {}", line);
+            errmsg_out = format!("{errmsg_out}{line}\n");
         }
+        errmsg_out.pop();
     };
 
     let _ = set_current_dir(prev_dir);
@@ -626,6 +629,16 @@ pub(crate) fn run_stage1_new2(
             set_local2remote_env_var(stage0);
     }
     */
+    match exit_code.parse::<i32>() {
+        Ok(i) => {
+            if i != 0 {
+                return Err(errmsg_out.into());
+            }
+        },
+        Err(_) => {
+            return Err(errmsg_out.into());
+        },
+    };
 
     return Ok(msg_out);
 }
