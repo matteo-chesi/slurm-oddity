@@ -189,47 +189,69 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
         .spawn()
         .expect(&format!("failed to execute {}", requested_exe_path));
 
+        info!("INFO_1");
         let msg = format!("{input_json}\n").as_bytes().to_vec();
         writer.write_all(&msg)?;
+        info!("INFO_2");
         writer.flush()?;
+        info!("INFO_3");
 
-        let stdout = match child.stdout.take() {
-            Some(out) => out,
-            None => {
-                return Err("failed to capture stdout".into());
+        let stdout = child.stdout.take(); 
+        info!("INFO_4");
+
+        let stderr = child.stderr.take();
+        info!("INFO_5");
+
+        match stdout {
+            Some(stdout) => {
+                let reader = BufReader::new(stdout);
+
+                let mut msg_out;
+                for ret_msg in reader.lines() {
+                    if ret_msg.is_ok() {
+                        msg_out = ret_msg.unwrap().clone();
+                        println!("{}", msg_out);
+                    }
+                }
             },
-        };
-
-        let mut stderr = match child.stderr.take() {
-            Some(err) => err,
-            None => {
-                return Err("failed to capture stderr".into());
-            },
-        };
-
-        let reader = BufReader::new(stdout);
-
-        let mut msg_out;
-        for ret_msg in reader.lines() {
-            if ret_msg.is_ok() {
-                msg_out = ret_msg.unwrap().clone();
-                println!("{}", msg_out);
-            }
+            None => {},
         }
+        info!("INFO_5.1");
+
+        let mut stderr_vec = vec![];
+        match stderr {
+            Some(mut stderr) => {
+                let _ = stderr.read_to_end(&mut stderr_vec);
+                let mut stderr = String::from_utf8(stderr_vec).unwrap_or(String::from(""));
+                if ! stderr.is_empty() {
+                    stderr.pop();
+                    let lines = stderr.split('\n');
+                    for line in lines {
+                        eprintln!("{}", line);
+                    }
+                };
+            },
+            None => {},
+        }
+        info!("INFO_5.2");
 
         let result = child.wait();
 
         if result.is_err() {
             return Err("failed to execute process".into());
         }
+        info!("INFO_6");
 
         let status = result.unwrap();
+        info!("INFO_7");
 
         let exit_code = match status.code() {
             Some(rc) => rc.to_string(),
             None => String::from("killed by signal"),
         };
+        info!("INFO_8");
 
+        /*
         let mut stderr_vec = vec![];
         let _ = stderr.read_to_end(&mut stderr_vec);
         let mut stderr = String::from_utf8(stderr_vec).unwrap_or(String::from(""));
@@ -240,10 +262,13 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("{}", line);
             }
         };
+        */
         let rc: i32 = match exit_code.parse() {
             Ok(n) => n,
             Err(_) => 1,
         };
+        info!("INFO_9");
+        info!("RC_INFO:{rc}");
         std::process::exit(rc);
     }
 
@@ -256,12 +281,18 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
         },
     };
     log_end(&state);
-    Ok(())
+    std::process::exit(0);
 }
 
 fn main() {
     let args = Args::parse();
-    let _ = run(&args);
+    match run(&args) {
+        Ok(_) => {},
+        Err(_) => {
+            std::process::exit(1);
+        },
+    }
+    std::process::exit(0);
 }
 
 pub(crate) fn load_state(
