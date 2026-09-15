@@ -3,10 +3,11 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use serde::{Serialize, Deserialize};
 use slurm_spank::{Context, SpankHandle};
+use tracing::{info, error};
 
-use crate::{SpankStage0, get_log_dirpath, log, log_error, remote_log, spank_getenv};
+use crate::{SpankStage0, spank_getenv};
 
-const CONFIGFILE_PATH: &str = "/etc/cosmodrome-stage0.conf";
+const CONFIGFILE_PATH: &str = "/etc/slurm-oddity-stage0.conf";
 
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct RawStage0Config {
@@ -14,7 +15,7 @@ pub struct RawStage0Config {
     stage1_system_path: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Stage0Config {
     #[serde(default = "get_default_stage1_user_path")]
     pub stage1_user_path: String,
@@ -23,7 +24,7 @@ pub struct Stage0Config {
 }
 
 fn get_default_stage1_user_path() -> String {
-    return String::from("$HOME/.local/share/cosmodrome/bin/stage1");
+    return String::from("$HOME/.local/share/slurm-oddity/bin/stage1");
 }
 
 fn get_default_stage1_system_path() -> String {
@@ -148,20 +149,13 @@ pub(crate) fn local_load_config(
     let config = match load_config() {
         Ok(cfg) => cfg,
         Err(e) => {
-            log_error!("{}", e);
-            log_error!("Error on configuration loading");
+            error!("Error on configuration loading: {e}");
             return Err(e);
         }
     };
 
-    let mut key = "SLURM_STAGE0_LOGDIR";
-    let mut value = get_log_dirpath();
-    unsafe {
-        std::env::set_var(key, OsStr::new(&value));
-    }
-
-    key = "SLURM_STAGE1_USER_BIN";
-    value = config.stage1_user_path.clone();
+    let mut key = "SLURM_STAGE1_USER_BIN";
+    let mut value = config.stage1_user_path.clone();
     unsafe {
         std::env::set_var(key, OsStr::new(&value));
     }
@@ -173,8 +167,8 @@ pub(crate) fn local_load_config(
     }
     plugin.config = config.clone();
 
-    log(&format!("STAGE1_USER_PATH: {}", plugin.config.stage1_user_path));
-    log(&format!("STAGE1_SYSTEM_PATH: {}", plugin.config.stage1_system_path));
+    info!("STAGE1_USER_PATH: {}", plugin.config.stage1_user_path);
+    info!("STAGE1_SYSTEM_PATH: {}", plugin.config.stage1_system_path);
 
     Ok(())
 }
@@ -198,8 +192,8 @@ pub(crate) fn remote_load_config(
     };
     plugin.config = config;
 
-    remote_log(plugin, spank, &format!("STAGE1_USER_PATH: {}", plugin.config.stage1_user_path));
-    remote_log(plugin, spank, &format!("STAGE1_SYSTEM_PATH: {}", plugin.config.stage1_system_path));
+    info!("STAGE1_USER_PATH: {}", plugin.config.stage1_user_path);
+    info!("STAGE1_SYSTEM_PATH: {}", plugin.config.stage1_system_path);
 
     Ok(())
 }

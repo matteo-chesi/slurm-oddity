@@ -1,0 +1,11 @@
+#!/usr/bin/bash
+
+TIMESTAMP="$(date +%Y%m%dT%H%M%S)"
+BASE_DIR=$(readlink -f $(dirname $0))
+DB_DIR="${BASE_DIR}/db"
+DATABASE="${DB_DIR}/launch-control.db"
+SQL_DUMP="${DB_DIR}/launch-control-db-dump-${TIMESTAMP}.sql"
+DATABASE_NAME=$(basename $DATABASE)
+SQL_DUMP_NAME=$(basename $SQL_DUMP)
+echo "Dumping ${DATABASE_NAME} into ${SQL_DUMP_NAME}"
+sqlite3 ${DATABASE} ".dump" > ${SQL_DUMP}
